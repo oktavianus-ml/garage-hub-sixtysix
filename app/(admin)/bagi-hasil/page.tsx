@@ -23,6 +23,7 @@ export default async function BagiHasilPage({
       <PageHeader
         title="Bagi hasil"
         description="Laba bulan ini dikunci setelah tutup buku. Dasarnya pendapatan dikurangi harga pokok dan pengeluaran kas."
+        href="/bagi-hasil"
       />
       <form action="/bagi-hasil" className="mt-5 flex max-w-md gap-2">
         <input type="month" name="bulan" defaultValue={month} className={inputClass} />

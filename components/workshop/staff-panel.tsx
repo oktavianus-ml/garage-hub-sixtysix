@@ -1,11 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
+import { UserPlus, Users } from "lucide-react";
 import { saveStaffAction } from "@/lib/data/actions";
 import { ROLES, roleLabel, type Role } from "@/lib/auth/roles";
 import type { StaffUser } from "@/lib/data/records";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
+import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function StaffPanel({ staff }: { staff: StaffUser[] }) {
@@ -14,7 +16,7 @@ export function StaffPanel({ staff }: { staff: StaffUser[] }) {
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-2">
       <GlassCard accent className="p-4">
-        <h2 className="text-base font-semibold">Pegawai baru</h2>
+        <SectionTitle icon={UserPlus}>Pegawai baru</SectionTitle>
         <p className="mt-1 text-sm text-muted">Masuk dengan email dan kata sandi ini.</p>
         <form action={action} className="mt-3 flex flex-col gap-3">
           <input name="name" required placeholder="Nama" className={inputClass} />
@@ -32,7 +34,9 @@ export function StaffPanel({ staff }: { staff: StaffUser[] }) {
         </form>
       </GlassCard>
       <GlassCard className="p-4">
-        <h2 className="text-base font-semibold">Tim</h2>
+        <SectionTitle icon={Users} tone="teal">
+          Tim
+        </SectionTitle>
         <ul className="mt-2 divide-y divide-line">
           {staff.map((person) => (
             <li key={person.id} className="flex items-center justify-between gap-3 py-3">

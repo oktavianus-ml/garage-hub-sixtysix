@@ -28,6 +28,7 @@ export default async function ServicePage({
       <PageHeader
         title="Service (SPK)"
         description="Order servis motor: keluhan, mekanik, part terpakai, dan ongkos jasa."
+        href="/service"
       />
       <ServicePanel
         orders={orders}

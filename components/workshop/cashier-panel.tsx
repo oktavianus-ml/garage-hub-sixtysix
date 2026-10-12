@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState, useActionState } from "react";
+import { Receipt, ShoppingBag } from "lucide-react";
 import { saveSaleAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
 import type { Product, WalkInSale } from "@/lib/data/records";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
+import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function CashierPanel({
@@ -32,7 +34,7 @@ export function CashierPanel({
     <div className="mt-5 grid gap-4 xl:grid-cols-2">
       {canWrite ? (
         <GlassCard accent className="p-4">
-          <h2 className="text-base font-semibold">Jual sparepart</h2>
+          <SectionTitle icon={ShoppingBag}>Jual sparepart</SectionTitle>
           <form action={action} className="mt-3 flex flex-col gap-3">
             <input type="hidden" name="lines" value={JSON.stringify(lines)} />
             <div className="flex gap-2">
@@ -97,7 +99,9 @@ export function CashierPanel({
         </GlassCard>
       ) : null}
       <GlassCard className="p-4">
-        <h2 className="text-base font-semibold">Penjualan walk-in</h2>
+        <SectionTitle icon={Receipt} tone="teal">
+          Penjualan walk-in
+        </SectionTitle>
         {sales.length === 0 ? (
           <p className="mt-3 text-sm text-muted">Belum ada penjualan.</p>
         ) : (

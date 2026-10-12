@@ -10,7 +10,7 @@ export default async function PegawaiPage() {
   const staff = await listStaff();
   return (
     <div>
-      <PageHeader title="Pegawai" description="Akun email pegawai dan peran yang menentukan menu." />
+      <PageHeader title="Pegawai" description="Akun email pegawai dan peran yang menentukan menu." href="/pegawai" />
       <StaffPanel staff={staff} />
     </div>
   );

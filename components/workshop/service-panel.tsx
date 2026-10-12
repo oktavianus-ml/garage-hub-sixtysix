@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState, useActionState } from "react";
+import { ClipboardList, Wrench } from "lucide-react";
 import { saveServiceAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
 import type { Customer, Product, ServiceOrder, SpkStatus, StaffUser, Vehicle } from "@/lib/data/records";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
+import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
 
 const labels: Record<SpkStatus, string> = {
@@ -63,7 +65,7 @@ export function ServicePanel({
     <div className="mt-5 grid gap-4 xl:grid-cols-2">
       {canWrite ? (
         <GlassCard accent className="p-4">
-          <h2 className="text-base font-semibold">{editing ? editing.no : "SPK baru"}</h2>
+          <SectionTitle icon={Wrench}>{editing ? editing.no : "SPK baru"}</SectionTitle>
           {locked ? (
             <p className="mt-3 text-sm text-muted">SPK ini tidak bisa diubah dari peran ini.</p>
           ) : (
@@ -188,7 +190,9 @@ export function ServicePanel({
         </GlassCard>
       ) : null}
       <GlassCard className="p-4">
-        <h2 className="text-base font-semibold">Order</h2>
+        <SectionTitle icon={ClipboardList} tone="teal">
+          Order
+        </SectionTitle>
         {orders.length === 0 ? (
           <p className="mt-3 text-sm text-muted">Belum ada SPK.</p>
         ) : (

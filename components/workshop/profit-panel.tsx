@@ -1,10 +1,12 @@
 "use client";
 
 import { useActionState } from "react";
+import { Lock, Percent, PieChart } from "lucide-react";
 import { closeMonthAction, saveSplitAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
+import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function ProfitPanel({
@@ -46,7 +48,9 @@ export function ProfitPanel({
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-2">
       <GlassCard className="p-4">
-        <h2 className="text-base font-semibold">{closed ? "Bulan terkunci" : "Pratinjau bulan"}</h2>
+        <SectionTitle icon={closed ? Lock : PieChart} tone="teal">
+          {closed ? "Bulan terkunci" : "Pratinjau bulan"}
+        </SectionTitle>
         <dl className="mt-3 divide-y divide-line">
           {rows.map(([label, value]) => (
             <div key={label} className="flex items-center justify-between gap-3 py-2 text-sm">
@@ -58,7 +62,7 @@ export function ProfitPanel({
       </GlassCard>
       {canWrite ? (
         <GlassCard accent className="p-4">
-          <h2 className="text-base font-semibold">Persentase</h2>
+          <SectionTitle icon={Percent}>Persentase</SectionTitle>
           {closed ? (
             <p className="mt-3 text-sm text-muted">Angka bulan ini sudah dikunci.</p>
           ) : (

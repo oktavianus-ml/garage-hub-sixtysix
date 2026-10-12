@@ -4,13 +4,15 @@ import { PageHeader } from "@/components/ui/page-header";
 export function ModulePlaceholder({
   title,
   description,
+  href,
 }: {
   title: string;
   description: string;
+  href: string;
 }) {
   return (
     <div>
-      <PageHeader title={title} description={description} />
+      <PageHeader title={title} description={description} href={href} />
       <GlassCard className="mt-5 px-6 py-14 text-center">
         <p className="text-base font-semibold">Modul ini menyusul</p>
         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">

@@ -7,5 +7,5 @@ export async function ModulePage({ href }: { href: string }) {
   await guard(href);
   const item = findNavItem(href);
   if (!item) notFound();
-  return <ModulePlaceholder title={item.label} description={item.description} />;
+  return <ModulePlaceholder title={item.label} description={item.description} href={href} />;
 }

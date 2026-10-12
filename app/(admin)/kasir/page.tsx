@@ -10,7 +10,7 @@ export default async function KasirPage() {
   const [products, sales] = await Promise.all([listProducts(), listSales()]);
   return (
     <div>
-      <PageHeader title="Kasir" description="Penjualan sparepart tanpa bongkar mesin." />
+      <PageHeader title="Kasir" description="Penjualan sparepart tanpa bongkar mesin." href="/kasir" />
       <CashierPanel products={products} sales={sales} canWrite={canWrite} />
     </div>
   );

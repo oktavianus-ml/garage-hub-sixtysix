@@ -1,8 +1,9 @@
-import { AlertTriangle, Banknote, PackageCheck, PieChart } from "lucide-react";
+import { AlertTriangle, Banknote, PackageCheck, PieChart, Store } from "lucide-react";
 import { rupiah } from "@/lib/data/format";
 import type { Product } from "@/lib/data/records";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/ui/page-header";
+import { SectionTitle } from "@/components/ui/section-title";
 
 type Movement = { title: string; note: string; amount: number };
 
@@ -28,9 +29,12 @@ export function DashboardHome({
   if (!hasActivity) {
     return (
       <div>
-        <PageHeader title="Dashboard" description={`Belum ada transaksi pada ${day}.`} />
+        <PageHeader title="Dashboard" description={`Belum ada transaksi pada ${day}.`} href="/" />
         <GlassCard className="mt-5 px-6 py-14 text-center">
-          <p className="text-base font-semibold">Bengkel masih kosong</p>
+          <span className="mx-auto inline-flex size-11 items-center justify-center rounded-xl bg-amber-soft text-amber">
+            <Store className="size-5" aria-hidden />
+          </span>
+          <p className="mt-3 text-base font-semibold">Bengkel masih kosong</p>
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted">
             Tambah pelanggan, motor, dan produk. Penjualan hari ini akan muncul di sini.
           </p>
@@ -73,7 +77,7 @@ export function DashboardHome({
 
   return (
     <div>
-      <PageHeader title="Dashboard" description={`Angka sungguhan untuk ${day}.`} />
+      <PageHeader title="Dashboard" description={`Angka sungguhan untuk ${day}.`} href="/" />
       <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((item) => {
           const Icon = item.icon;
@@ -95,7 +99,9 @@ export function DashboardHome({
       </section>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <GlassCard className="p-4 md:p-5">
-          <h2 className="text-base font-semibold">Di bawah stok aman</h2>
+          <SectionTitle icon={AlertTriangle} tone="danger">
+            Di bawah stok aman
+          </SectionTitle>
           {lowStock.length === 0 ? (
             <p className="mt-3 text-sm text-muted">Semua barang masih di atas batas aman.</p>
           ) : (
@@ -113,7 +119,9 @@ export function DashboardHome({
           )}
         </GlassCard>
         <GlassCard className="p-4 md:p-5">
-          <h2 className="text-base font-semibold">Barang laku</h2>
+          <SectionTitle icon={PackageCheck} tone="teal">
+            Barang laku
+          </SectionTitle>
           {movements.length === 0 ? (
             <p className="mt-3 text-sm text-muted">Belum ada pembayaran hari ini.</p>
           ) : (

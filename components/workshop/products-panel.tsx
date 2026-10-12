@@ -1,11 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
+import { PackagePlus, Tags } from "lucide-react";
 import { saveProductAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
 import type { Product } from "@/lib/data/records";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
+import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function ProductsPanel({
@@ -21,7 +23,7 @@ export function ProductsPanel({
     <div className="mt-5 grid gap-4 lg:grid-cols-2">
       {canWrite ? (
         <GlassCard accent className="p-4">
-          <h2 className="text-base font-semibold">Produk</h2>
+          <SectionTitle icon={PackagePlus}>Produk</SectionTitle>
           <form action={action} className="mt-3 grid gap-3 sm:grid-cols-2">
             <input name="name" required placeholder="Nama barang" className={`${inputClass} sm:col-span-2`} />
             <input name="unit" placeholder="Satuan" defaultValue="pcs" className={inputClass} />
@@ -43,7 +45,9 @@ export function ProductsPanel({
         </GlassCard>
       ) : null}
       <GlassCard className="p-4">
-        <h2 className="text-base font-semibold">Daftar harga</h2>
+        <SectionTitle icon={Tags} tone="teal">
+          Daftar harga
+        </SectionTitle>
         {products.length === 0 ? (
           <p className="mt-3 text-sm text-muted">Belum ada produk.</p>
         ) : (

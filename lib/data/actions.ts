@@ -39,8 +39,9 @@ export async function saveCustomerAction(_prev: FormState, formData: FormData): 
   const name = String(formData.get("name") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
   if (name.length < 2) return { message: "Isi nama pelanggan." };
+  let id = "";
   try {
-    await saveCustomer({
+    id = await saveCustomer({
       id: String(formData.get("id") ?? "") || undefined,
       name,
       phone,
@@ -48,7 +49,7 @@ export async function saveCustomerAction(_prev: FormState, formData: FormData): 
   } catch (error) {
     return fail(error);
   }
-  redirect("/pelanggan");
+  redirect(`/pelanggan?pelanggan=${encodeURIComponent(id)}`);
 }
 
 export async function saveVehicleAction(_prev: FormState, formData: FormData): Promise<FormState> {

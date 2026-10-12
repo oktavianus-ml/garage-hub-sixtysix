@@ -17,7 +17,7 @@ export default async function KasPage() {
 
   return (
     <div>
-      <PageHeader title="Kas harian" description="Uang masuk, pengeluaran kas, dan tutup kas hari ini." />
+      <PageHeader title="Kas harian" description="Uang masuk, pengeluaran kas, dan tutup kas hari ini." href="/kas" />
       <CashPanel
         day={day}
         cashIn={cashIn}

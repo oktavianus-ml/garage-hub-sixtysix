@@ -10,7 +10,7 @@ export default async function InventoriPage() {
   const products = await listProducts();
   return (
     <div>
-      <PageHeader title="Inventori" description="Stok yang ada dan batas aman sebelum harus order lagi." />
+      <PageHeader title="Inventori" description="Stok yang ada dan batas aman sebelum harus order lagi." href="/inventori" />
       <InventoryPanel products={products} />
     </div>
   );

@@ -1,6 +1,8 @@
+import { Warehouse } from "lucide-react";
 import { rupiah } from "@/lib/data/format";
 import type { Product } from "@/lib/data/records";
 import { GlassCard } from "@/components/ui/glass-card";
+import { SectionTitle } from "@/components/ui/section-title";
 
 export function InventoryPanel({ products }: { products: Product[] }) {
   const low = products.filter((product) => product.stock <= product.safetyStock);
@@ -13,10 +15,13 @@ export function InventoryPanel({ products }: { products: Product[] }) {
         </div>
       ) : null}
       <GlassCard className="p-4">
+        <SectionTitle icon={Warehouse} tone="teal">
+          Stok
+        </SectionTitle>
         {products.length === 0 ? (
-          <p className="text-sm text-muted">Belum ada stok.</p>
+          <p className="mt-3 text-sm text-muted">Belum ada stok.</p>
         ) : (
-          <ul className="divide-y divide-line">
+          <ul className="mt-2 divide-y divide-line">
             {products.map((product) => {
               const warn = product.stock <= product.safetyStock;
               return (

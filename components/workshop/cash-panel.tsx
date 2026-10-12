@@ -1,11 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
+import { Lock, Wallet } from "lucide-react";
 import { saveCashAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
 import type { CashDay } from "@/lib/data/records";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
+import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function CashPanel({
@@ -28,7 +30,9 @@ export function CashPanel({
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-2">
       <GlassCard className="p-4">
-        <h2 className="text-base font-semibold">{day}</h2>
+        <SectionTitle icon={Wallet} tone="teal">
+          {day}
+        </SectionTitle>
         <dl className="mt-3 grid gap-2 text-sm">
           <div className="flex justify-between gap-3">
             <dt className="text-muted">Uang masuk</dt>
@@ -53,7 +57,7 @@ export function CashPanel({
       </GlassCard>
       {canWrite ? (
         <GlassCard accent className="p-4">
-          <h2 className="text-base font-semibold">Tutup kas</h2>
+          <SectionTitle icon={Lock}>Tutup kas</SectionTitle>
           {monthClosed ? (
             <p className="mt-3 text-sm text-muted">Bulan ini sudah ditutup.</p>
           ) : (

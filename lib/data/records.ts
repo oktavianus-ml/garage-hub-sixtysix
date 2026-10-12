@@ -209,6 +209,7 @@ export async function saveCustomer(input: { id?: string; name: string; phone: st
     ? store().collection("customers").doc(input.id)
     : store().collection("customers").doc();
   await ref.set({ name: input.name, phone: input.phone }, { merge: true });
+  return ref.id;
 }
 
 export async function saveVehicle(input: {

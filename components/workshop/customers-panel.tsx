@@ -1,24 +1,29 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Bike, List, UserPlus } from "lucide-react";
 import { saveCustomerAction, saveVehicleAction } from "@/lib/data/actions";
 import { OTHER_BIKE, bikeBrands, bikeTypes, yearsForBike } from "@/lib/data/bikes";
 import type { Customer, Vehicle } from "@/lib/data/records";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
+import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function CustomersPanel({
   customers,
   vehicles,
   canWrite,
+  selectedCustomerId = "",
 }: {
   customers: Customer[];
   vehicles: Vehicle[];
   canWrite: boolean;
+  selectedCustomerId?: string;
 }) {
   const [customerState, customerAction, customerPending] = useActionState(saveCustomerAction, null);
   const [vehicleState, vehicleAction, vehiclePending] = useActionState(saveVehicleAction, null);
+  const [customerId, setCustomerId] = useState(selectedCustomerId);
   const [brandChoice, setBrandChoice] = useState("");
   const [typeChoice, setTypeChoice] = useState("");
   const [yearChoice, setYearChoice] = useState("");
@@ -34,23 +39,32 @@ export function CustomersPanel({
         : [];
 
   return (
-    <div className="mt-5 grid gap-4 lg:grid-cols-2">
+    <div className="mt-5 grid items-stretch gap-4 lg:grid-cols-2">
       {canWrite ? (
-        <GlassCard accent className="p-4">
-          <h2 className="text-base font-semibold">Pelanggan baru</h2>
-          <form action={customerAction} className="mt-3 flex flex-col gap-3">
+        <GlassCard accent className="flex h-full flex-col p-4">
+          <SectionTitle icon={UserPlus}>Pelanggan baru</SectionTitle>
+          <form action={customerAction} className="mt-3 flex flex-1 flex-col gap-3">
             <input name="name" required placeholder="Nama" className={inputClass} />
             <input name="phone" placeholder="Telepon" className={inputClass} />
             {customerState?.message ? <p className="text-sm text-danger">{customerState.message}</p> : null}
+            <p className="mt-auto text-sm leading-6 text-muted">
+              Simpan dulu. Nama ini langsung terpilih di kartu motor.
+            </p>
             <SaveButton pending={customerPending}>Simpan pelanggan</SaveButton>
           </form>
         </GlassCard>
       ) : null}
       {canWrite ? (
-        <GlassCard accent className="p-4">
-          <h2 className="text-base font-semibold">Motor pelanggan</h2>
-          <form action={vehicleAction} className="mt-3 flex flex-col gap-3">
-            <select name="customerId" required className={inputClass} defaultValue="">
+        <GlassCard accent className="flex h-full flex-col p-4">
+          <SectionTitle icon={Bike}>Motor pelanggan</SectionTitle>
+          <form action={vehicleAction} className="mt-3 flex flex-1 flex-col gap-3">
+            <select
+              name="customerId"
+              required
+              className={inputClass}
+              value={customerId}
+              onChange={(event) => setCustomerId(event.target.value)}
+            >
               <option value="" disabled>
                 Pilih pelanggan
               </option>
@@ -128,14 +142,16 @@ export function CustomersPanel({
               ))}
             </select>
             {vehicleState?.message ? <p className="text-sm text-danger">{vehicleState.message}</p> : null}
-            <SaveButton pending={vehiclePending} disabled={customers.length === 0}>
+            <SaveButton pending={vehiclePending} disabled={customers.length === 0} className="mt-auto">
               Simpan motor
             </SaveButton>
           </form>
         </GlassCard>
       ) : null}
       <GlassCard className="p-4 lg:col-span-2">
-        <h2 className="text-base font-semibold">Daftar</h2>
+        <SectionTitle icon={List} tone="teal">
+          Daftar
+        </SectionTitle>
         {customers.length === 0 ? (
           <p className="mt-3 text-sm text-muted">Belum ada pelanggan.</p>
         ) : (
