@@ -1,8 +1,20 @@
-import type { Metadata } from "next";
-import { ModulePage } from "@/components/ui/module-page";
+import { CustomersPanel } from "@/components/workshop/customers-panel";
+import { PageHeader } from "@/components/ui/page-header";
+import { guard } from "@/lib/auth/guard";
+import { listCustomers, listVehicles } from "@/lib/data/records";
 
-export const metadata: Metadata = { title: "Pelanggan" };
+export const metadata = { title: "Pelanggan" };
 
-export default function PelangganPage() {
-  return <ModulePage href="/pelanggan" />;
+export default async function PelangganPage() {
+  const { canWrite } = await guard("/pelanggan");
+  const [customers, vehicles] = await Promise.all([listCustomers(), listVehicles()]);
+  return (
+    <div>
+      <PageHeader
+        title="Pelanggan"
+        description="Data pelanggan dan motor yang dipakai tiap servis."
+      />
+      <CustomersPanel customers={customers} vehicles={vehicles} canWrite={canWrite} />
+    </div>
+  );
 }

@@ -8,15 +8,24 @@ import { isActivePath, navGroups } from "@/lib/nav";
 export function NavList({
   showLabels,
   onNavigate,
+  allowedHrefs,
 }: {
   showLabels: boolean;
   onNavigate?: () => void;
+  allowedHrefs: string[];
 }) {
   const pathname = usePathname();
+  const allowed = new Set(allowedHrefs);
+  const groups = navGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => allowed.has(item.href)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <nav aria-label="Menu utama" className="flex flex-col gap-5">
-      {navGroups.map((group) => (
+      {groups.map((group) => (
         <div key={group.label}>
           <p
             className={cn(

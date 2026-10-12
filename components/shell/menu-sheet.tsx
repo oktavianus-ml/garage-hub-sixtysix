@@ -8,9 +8,11 @@ import { cn } from "@/lib/cn";
 export function MenuSheet({
   open,
   onClose,
+  allowedHrefs,
 }: {
   open: boolean;
   onClose: () => void;
+  allowedHrefs: string[];
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -53,7 +55,7 @@ export function MenuSheet({
             <X className="size-5" />
           </button>
         </div>
-        <NavList showLabels onNavigate={onClose} />
+        <NavList showLabels onNavigate={onClose} allowedHrefs={allowedHrefs} />
       </div>
     </div>
   );

@@ -2,12 +2,19 @@
 
 import { Search } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { LogoutButton } from "@/components/shell/logout-button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { roleLabel, type Role } from "@/lib/auth/roles";
 import { findNavItem } from "@/lib/nav";
 
-export function Topbar() {
+export function Topbar({
+  user,
+}: {
+  user: { name: string; role: Role };
+}) {
   const pathname = usePathname();
   const current = findNavItem(pathname);
+  const initial = user.name.trim().charAt(0).toUpperCase() || "G";
 
   return (
     <header className="sticky top-0 z-20">
@@ -30,13 +37,16 @@ export function Topbar() {
             <ThemeToggle />
             <div className="hidden items-center gap-2 rounded-full border border-line bg-chip py-1 pr-3 pl-1 sm:flex">
               <span className="flex size-8 items-center justify-center rounded-full bg-amber-soft text-xs font-bold text-amber">
-                P
+                {initial}
               </span>
               <span className="text-left text-sm leading-tight">
-                <span className="block text-[11px] text-muted">Contoh</span>
-                <span className="font-medium">Pemilik</span>
+                <span className="block max-w-32 truncate text-[11px] text-muted">
+                  {user.name}
+                </span>
+                <span className="font-medium">{roleLabel[user.role]}</span>
               </span>
             </div>
+            <LogoutButton />
           </div>
         </div>
       </div>

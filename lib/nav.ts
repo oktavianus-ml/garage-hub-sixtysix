@@ -11,6 +11,7 @@ import {
   Settings,
   ShoppingBag,
   Truck,
+  Wallet,
   Users,
   Warehouse,
   Wrench,
@@ -105,6 +106,12 @@ export const navGroups: NavGroup[] = [
   {
     label: "Keuangan",
     items: [
+      {
+        label: "Kas harian",
+        href: "/kas",
+        icon: Wallet,
+        description: "Uang masuk hari ini, pengeluaran kas, dan tutup kas.",
+      },
       {
         label: "Laporan",
         href: "/laporan",

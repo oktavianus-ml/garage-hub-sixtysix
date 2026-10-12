@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { DashboardHome } from "@/components/dashboard/dashboard-home";
+import { guard } from "@/lib/auth/guard";
+import { todayBoard } from "@/lib/data/records";
 
-export const metadata: Metadata = {
-  title: "Dashboard",
-};
+export const metadata = { title: "Dashboard" };
 
-export default function DashboardPage() {
-  return <DashboardHome />;
+export default async function DashboardPage() {
+  await guard("/");
+  const board = await todayBoard();
+  return <DashboardHome {...board} />;
 }

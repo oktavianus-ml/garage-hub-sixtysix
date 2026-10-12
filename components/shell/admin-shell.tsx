@@ -7,9 +7,18 @@ import { BottomNav } from "@/components/shell/bottom-nav";
 import { MenuSheet } from "@/components/shell/menu-sheet";
 import { NavList } from "@/components/shell/nav-list";
 import { Topbar } from "@/components/shell/topbar";
+import { type Role } from "@/lib/auth/roles";
 import { cn } from "@/lib/cn";
 
-export function AdminShell({ children }: { children: React.ReactNode }) {
+export function AdminShell({
+  children,
+  user,
+  allowedHrefs,
+}: {
+  children: React.ReactNode;
+  user: { name: string; role: Role };
+  allowedHrefs: string[];
+}) {
   const [railOpen, setRailOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -31,7 +40,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <BrandMark />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-          <NavList showLabels />
+          <NavList showLabels allowedHrefs={allowedHrefs} />
         </div>
       </aside>
 
@@ -57,6 +66,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <NavList
             showLabels={railOpen}
             onNavigate={() => setRailOpen(false)}
+            allowedHrefs={allowedHrefs}
           />
         </div>
         <button
@@ -77,12 +87,20 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="md:pl-[72px] xl:pl-[248px]">
-        <Topbar />
+        <Topbar user={user} />
         <main className="px-4 pt-4 pb-24 md:px-6 md:pt-6 md:pb-8">{children}</main>
       </div>
 
-      <BottomNav menuOpen={menuOpen} onOpenMenu={() => setMenuOpen(true)} />
-      <MenuSheet open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <BottomNav
+        menuOpen={menuOpen}
+        onOpenMenu={() => setMenuOpen(true)}
+        allowedHrefs={allowedHrefs}
+      />
+      <MenuSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        allowedHrefs={allowedHrefs}
+      />
     </div>
   );
 }
