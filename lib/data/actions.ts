@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { guard } from "@/lib/auth/guard";
 import { isRole } from "@/lib/auth/roles";
 import { bikeSelectionError } from "@/lib/data/bikes";
+import { saveBudget } from "@/lib/data/budget";
 import { asInt, isBusinessDay } from "@/lib/data/format";
 import { parsePayMethod } from "@/lib/data/payment";
 import { isSupplyUnit } from "@/lib/data/supply";
@@ -561,13 +562,19 @@ export async function saveCashAction(_prev: FormState, formData: FormData): Prom
 export async function saveSplitAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/bagi-hasil");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
-  const ownerPercent = asInt(formData.get("ownerPercent"));
-  const investorPercent = asInt(formData.get("investorPercent"));
-  if (ownerPercent === null || investorPercent === null) {
-    return { message: "Isi persentase pemilik dan investor." };
+  const ids = formData.getAll("partnerId");
+  const names = formData.getAll("partnerName");
+  const percents = formData.getAll("partnerPercent");
+  if (ids.length === 0 || ids.length !== names.length || ids.length !== percents.length) {
+    return { message: "Data orang tidak lengkap." };
   }
+  const partners = ids.map((id, index) => {
+    const raw = String(percents[index] ?? "").trim();
+    const percent = /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
+    return { id: String(id), name: String(names[index] ?? ""), percent };
+  });
   try {
-    await saveProfitSplit({ ownerPercent, investorPercent }, access.user);
+    await saveProfitSplit({ partners }, access.user);
   } catch (error) {
     return fail(error);
   }
@@ -585,4 +592,30 @@ export async function closeMonthAction(_prev: FormState, formData: FormData): Pr
     return fail(error);
   }
   redirect(`/bagi-hasil?bulan=${month}`);
+}
+
+export async function saveBudgetAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const access = await guard("/audit");
+  if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const month = String(formData.get("month") ?? "");
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return { message: "Pilih bulan." };
+  const pembelian = asInt(formData.get("pembelian"));
+  const pengadaan = asInt(formData.get("pengadaan"));
+  const kas = asInt(formData.get("kas"));
+  if (pembelian === null || pengadaan === null || kas === null) {
+    return { message: "Isi anggaran pembelian, pengadaan, dan pengeluaran kas." };
+  }
+  try {
+    await saveBudget(
+      {
+        month,
+        plan: { pembelian, pengadaan, kas },
+        note: String(formData.get("note") ?? "").trim(),
+      },
+      access.user,
+    );
+  } catch (error) {
+    return fail(error);
+  }
+  redirect(`/audit?bulan=${month}`);
 }

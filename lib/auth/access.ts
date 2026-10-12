@@ -29,6 +29,7 @@ const byRole: Record<Role, Record<string, Access>> = {
     "/kas": "read",
     "/pembayaran": "read",
     "/bagi-hasil": "read",
+    "/audit": "read",
   },
   kasir: {
     "/": "read",

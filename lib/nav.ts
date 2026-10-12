@@ -212,7 +212,7 @@ export const navGroups: NavGroup[] = [
         href: "/bagi-hasil",
         icon: PieChart,
         description:
-          "Pembagian laba akhir bulan dan persentase pemilik serta investor.",
+          "Pembagian laba akhir bulan ke beberapa orang. Total persentase harus 100.",
       },
       {
         label: "Audit budget",

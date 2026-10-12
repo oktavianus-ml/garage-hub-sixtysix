@@ -17,19 +17,20 @@ export default async function BagiHasilPage({
   const month =
     params.bulan && /^\d{4}-\d{2}$/.test(params.bulan) ? params.bulan : monthKeyOf(jakartaDate());
   const preview = await previewMonth(month);
+  const shareKey = preview.shares.map((share) => `${share.id}:${share.name}:${share.percent}`).join("|");
 
   return (
     <div>
       <PageHeader
         title="Bagi hasil"
-        description="Laba bulan ini dikunci setelah tutup buku. Dasarnya pendapatan dikurangi harga pokok dan pengeluaran kas."
+        description="Laba bulan ini dikunci setelah tutup buku. Dasarnya pendapatan dikurangi harga pokok dan pengeluaran kas. Bagian tiap orang mengikuti persentase, dan totalnya harus 100."
         href="/bagi-hasil"
       />
       <form action="/bagi-hasil" className="mt-5 flex max-w-md gap-2">
         <input type="month" name="bulan" defaultValue={month} className={inputClass} />
         <button className={buttonClass}>Lihat</button>
       </form>
-      <ProfitPanel month={month} canWrite={canWrite} {...preview} />
+      <ProfitPanel key={`${month}:${shareKey}`} month={month} canWrite={canWrite} {...preview} />
     </div>
   );
 }

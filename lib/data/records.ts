@@ -9,6 +9,15 @@ import {
   type ActivityChange,
 } from "@/lib/data/activity";
 import { isBusinessDay, jakartaDate, monthKeyOf, rupiah } from "@/lib/data/format";
+import {
+  allocateShares,
+  labeledPartners,
+  partnersFromRecord,
+  sharesFromClose,
+  splitError,
+  type ProfitPartner,
+  type ProfitShare,
+} from "@/lib/data/profit-split";
 import { parsePayMethod, payMethodLabel, type PayMethod } from "@/lib/data/payment";
 import { PURCHASE_STATUSES, purchaseStatusLabel, type PurchaseStatus } from "@/lib/data/purchase";
 import { isSupplyUnit } from "@/lib/data/supply";
@@ -176,20 +185,19 @@ export type CustomerPayment = {
   createdAt: string;
 };
 
+export type { ProfitPartner, ProfitShare } from "@/lib/data/profit-split";
+
 export type MonthClose = {
   id: string;
   revenue: number;
   cogs: number;
   cashOut: number;
   profit: number;
-  ownerPercent: number;
-  investorPercent: number;
-  ownerShare: number;
-  investorShare: number;
+  shares: ProfitShare[];
   closedAt: string;
 };
 
-export type ProfitSplit = { ownerPercent: number; investorPercent: number };
+export type ProfitSplit = { partners: ProfitPartner[] };
 
 const SPK_STATUSES: SpkStatus[] = ["antri", "dikerjakan", "selesai", "lunas", "batal"];
 
@@ -1715,37 +1723,35 @@ export async function saveCashDay(
   });
 }
 
+function percentFields(partners: ProfitPartner[]) {
+  return Object.fromEntries(labeledPartners(partners).map(({ label, row }) => [label, `${row.percent}%`]));
+}
+
 export async function getProfitSplit(): Promise<ProfitSplit> {
   const snap = await store().doc("settings/profitSplit").get();
-  return {
-    ownerPercent: snap.exists ? num(snap.data()?.ownerPercent) : 50,
-    investorPercent: snap.exists ? num(snap.data()?.investorPercent) : 50,
-  };
+  return { partners: partnersFromRecord(snap.data()) };
 }
 
 export async function saveProfitSplit(split: ProfitSplit, actor: ActivityActor) {
-  if (split.ownerPercent + split.investorPercent !== 100) {
-    throw new Error("Persentase pemilik dan investor harus 100.");
-  }
+  const partners = split.partners.map((partner) => ({
+    id: partner.id.trim(),
+    name: partner.name.trim(),
+    percent: partner.percent,
+  }));
+  const message = splitError(partners);
+  if (message) throw new Error(message);
   const ref = store().doc("settings/profitSplit");
   const existing = await ref.get();
-  const before = priorFields(existing.exists, {
-    "Persen pemilik": `${num(existing.data()?.ownerPercent)}%`,
-    "Persen investor": `${num(existing.data()?.investorPercent)}%`,
-  });
-  const after = {
-    "Persen pemilik": `${split.ownerPercent}%`,
-    "Persen investor": `${split.investorPercent}%`,
-  };
+  const before = priorFields(existing.exists, percentFields(partnersFromRecord(existing.data())));
   const batch = store().batch();
-  batch.set(ref, split);
+  batch.set(ref, { partners });
   queueActivity(batch, {
     actor,
     action: existing.exists ? "ubah" : "buat",
     entity: "bagi-hasil",
     entityId: "profitSplit",
     label: existing.exists ? "Persentase bagi hasil diubah" : "Persentase bagi hasil dibuat",
-    changes: fieldChanges(before, after),
+    changes: fieldChanges(before, percentFields(partners)),
   });
   await batch.commit();
 }
@@ -1766,10 +1772,9 @@ async function monthFigures(tx: Transaction, month: string) {
     paidOrders.reduce((sum, order) => sum + order.partsCost, 0) +
     sales.docs.reduce((sum, doc) => sum + num(doc.data().costTotal), 0);
   const cashOut = days.docs.reduce((sum, doc) => sum + num(doc.data().cashOut), 0);
-  const ownerPercent = splitSnap.exists ? num(splitSnap.data()?.ownerPercent) : 50;
-  const investorPercent = splitSnap.exists ? num(splitSnap.data()?.investorPercent) : 50;
+  const partners = partnersFromRecord(splitSnap.data());
   const profit = revenue - cogs - cashOut;
-  return { revenue, cogs, cashOut, profit, ownerPercent, investorPercent };
+  return { revenue, cogs, cashOut, profit, partners };
 }
 
 export async function previewMonth(month: string) {
@@ -1783,19 +1788,18 @@ export async function previewMonth(month: string) {
       cogs: num(data.cogs),
       cashOut: num(data.cashOut),
       profit: num(data.profit),
-      ownerPercent: num(data.ownerPercent),
-      investorPercent: num(data.investorPercent),
-      ownerShare: num(data.ownerShare),
-      investorShare: num(data.investorShare),
+      shares: sharesFromClose(data),
       closedAt: text(data.closedAt),
     };
   }
   const figures = await database.runTransaction(async (tx) => monthFigures(tx, month));
   return {
     closed: false as const,
-    ...figures,
-    ownerShare: Math.round((figures.profit * figures.ownerPercent) / 100),
-    investorShare: Math.round((figures.profit * figures.investorPercent) / 100),
+    revenue: figures.revenue,
+    cogs: figures.cogs,
+    cashOut: figures.cashOut,
+    profit: figures.profit,
+    shares: allocateShares(figures.profit, figures.partners),
     closedAt: null,
   };
 }
@@ -1805,17 +1809,16 @@ export async function closeMonth(month: string, actor: ActivityActor) {
   await database.runTransaction(async (tx) => {
     await ensureOpen(tx, month);
     const figures = await monthFigures(tx, month);
-    if (figures.ownerPercent + figures.investorPercent !== 100) {
-      throw new Error("Atur persentase pemilik dan investor dulu.");
-    }
-    const profit = figures.profit;
-    const ownerShare = Math.round((profit * figures.ownerPercent) / 100);
-    const investorShare = Math.round((profit * figures.investorPercent) / 100);
+    const message = splitError(figures.partners);
+    if (message) throw new Error(message);
+    const shares = allocateShares(figures.profit, figures.partners);
     tx.set(database.doc(`monthCloses/${month}`), {
       status: "closed",
-      ...figures,
-      ownerShare,
-      investorShare,
+      revenue: figures.revenue,
+      cogs: figures.cogs,
+      cashOut: figures.cashOut,
+      profit: figures.profit,
+      shares,
       closedAt: new Date().toISOString(),
     });
     queueActivity(tx, {
@@ -1830,9 +1833,13 @@ export async function closeMonth(month: string, actor: ActivityActor) {
           Omzet: rupiah(figures.revenue),
           "Harga pokok": rupiah(figures.cogs),
           "Pengeluaran kas": rupiah(figures.cashOut),
-          Laba: rupiah(profit),
-          "Bagian pemilik": `${rupiah(ownerShare)} (${figures.ownerPercent}%)`,
-          "Bagian investor": `${rupiah(investorShare)} (${figures.investorPercent}%)`,
+          Laba: rupiah(figures.profit),
+          ...Object.fromEntries(
+            labeledPartners(shares).map(({ label, row }) => [
+              `Bagian ${label}`,
+              `${rupiah(row.amount)} (${row.percent}%)`,
+            ]),
+          ),
         },
       ),
     });
