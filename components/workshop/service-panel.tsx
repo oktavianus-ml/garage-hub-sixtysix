@@ -4,6 +4,7 @@ import { useMemo, useState, useActionState } from "react";
 import { ClipboardList, Wrench } from "lucide-react";
 import { saveServiceAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
+import { PAY_METHODS, payMethodLabel } from "@/lib/data/payment";
 import type { Customer, Product, ServiceOrder, SpkStatus, StaffUser, Vehicle } from "@/lib/data/records";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
@@ -47,6 +48,7 @@ export function ServicePanel({
 }) {
   const [state, action, pending] = useActionState(saveServiceAction, null);
   const [customerId, setCustomerId] = useState(editing?.customerId ?? "");
+  const [status, setStatus] = useState<SpkStatus>(editing?.status ?? "antri");
   const [parts, setParts] = useState(editing?.parts.map((part) => ({ productId: part.productId, qty: part.qty })) ?? []);
   const bikes = vehicles.filter((vehicle) => vehicle.customerId === customerId);
   const locked = !canWrite || (!canPay && (editing?.status === "lunas" || editing?.status === "batal"));
@@ -117,10 +119,18 @@ export function ServicePanel({
                 defaultValue={editing?.laborCost ?? 0}
                 className={inputClass}
               />
-              <select name="status" className={inputClass} defaultValue={editing?.status ?? "antri"}>
-                {statuses.map((status) => (
-                  <option key={status} value={status}>
-                    {labels[status]}
+              <select name="status" className={inputClass} value={status} onChange={(event) => setStatus(event.target.value as SpkStatus)}>
+                {statuses.map((item) => (
+                  <option key={item} value={item}>
+                    {labels[item]}
+                  </option>
+                ))}
+              </select>
+              <select name="payMethod" className={inputClass} defaultValue={editing?.payMethod ?? ""} required={status === "lunas"}>
+                <option value="">Tempat uang{status === "lunas" ? "" : ", wajib saat lunas"}</option>
+                {PAY_METHODS.map((method) => (
+                  <option key={method} value={method}>
+                    {payMethodLabel[method]}
                   </option>
                 ))}
               </select>
@@ -209,7 +219,10 @@ export function ServicePanel({
                 <p className="text-sm text-muted">
                   {order.customerName} · {order.plate} · {order.mechanicName}
                 </p>
-                <p className="text-sm font-semibold text-amber tabular-nums">{rupiah(order.grand)}</p>
+                <p className="text-sm font-semibold text-amber tabular-nums">
+                  {rupiah(order.grand)}
+                  {order.status === "lunas" ? ` · ${order.payMethod ? payMethodLabel[order.payMethod] : "Belum dicatat"}` : ""}
+                </p>
               </li>
             ))}
           </ul>

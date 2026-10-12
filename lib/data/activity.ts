@@ -14,6 +14,7 @@ export const ACTIVITY_ENTITIES = [
   "spk",
   "kasir",
   "kas",
+  "pembayaran",
   "bagi-hasil",
   "tutup-bulan",
 ] as const;
@@ -31,7 +32,8 @@ export const activityEntityLabel: Record<ActivityEntity, string> = {
   pegawai: "Pegawai",
   spk: "Service (SPK)",
   kasir: "Kasir",
-  kas: "Kas harian",
+  kas: "Pantauan",
+  pembayaran: "Pembayaran",
   "bagi-hasil": "Bagi hasil",
   "tutup-bulan": "Tutup bulan",
 };

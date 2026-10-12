@@ -6,7 +6,7 @@ import { MenuButton } from "@/components/shell/menu-sheet";
 import { cn } from "@/lib/cn";
 import { findNavItem, isActivePath } from "@/lib/nav";
 
-const preferred = ["/", "/service", "/kasir", "/inventori", "/produk", "/kas", "/bagi-hasil"];
+const preferred = ["/", "/service", "/kasir", "/inventori", "/produk", "/pembayaran/catat", "/bagi-hasil"];
 
 export function BottomNav({
   menuOpen,

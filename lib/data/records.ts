@@ -8,7 +8,8 @@ import {
   type ActivityActor,
   type ActivityChange,
 } from "@/lib/data/activity";
-import { jakartaDate, monthKeyOf, rupiah } from "@/lib/data/format";
+import { isBusinessDay, jakartaDate, monthKeyOf, rupiah } from "@/lib/data/format";
+import { parsePayMethod, payMethodLabel, type PayMethod } from "@/lib/data/payment";
 import { PURCHASE_STATUSES, purchaseStatusLabel, type PurchaseStatus } from "@/lib/data/purchase";
 import { isSupplyUnit } from "@/lib/data/supply";
 import { heldQty, holdDelta, type HeldPart } from "@/lib/data/stock";
@@ -127,6 +128,7 @@ export type ServiceOrder = {
   partsCost: number;
   grand: number;
   paidDate: string | null;
+  payMethod: PayMethod | null;
   monthKey: string | null;
   createdAt: string;
 };
@@ -139,6 +141,7 @@ export type WalkInSale = {
   total: number;
   costTotal: number;
   businessDate: string;
+  payMethod: PayMethod | null;
   monthKey: string;
   createdAt: string;
 };
@@ -147,9 +150,30 @@ export type CashDay = {
   id: string;
   cashOut: number;
   counted: number | null;
+  qrisReceived: number | null;
+  bankReceived: number | null;
   note: string;
   closedAt: string | null;
   monthKey: string;
+};
+
+export type ChannelTotals = {
+  tunai: number;
+  qris: number;
+  bank: number;
+  unknown: number;
+};
+
+export type CustomerPayment = {
+  id: string;
+  customerId: string;
+  customerName: string;
+  payMethod: PayMethod;
+  amount: number;
+  note: string;
+  businessDate: string;
+  monthKey: string;
+  createdAt: string;
 };
 
 export type MonthClose = {
@@ -187,6 +211,15 @@ function text(value: unknown, fallback = "") {
 
 function num(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : Number(value) || 0;
+}
+
+function optionalNum(value: unknown): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  return num(value);
+}
+
+function moneyLabel(value: number | null) {
+  return value === null ? "belum diisi" : rupiah(value);
 }
 
 async function ensureOpen(tx: Transaction, month: string) {
@@ -258,6 +291,7 @@ function mapOrder(id: string, data: FirebaseFirestore.DocumentData): ServiceOrde
     partsCost: num(data.partsCost),
     grand: num(data.grand),
     paidDate: data.paidDate ? text(data.paidDate) : null,
+    payMethod: parsePayMethod(data.payMethod),
     monthKey: data.monthKey ? text(data.monthKey) : null,
     createdAt: text(data.createdAt),
   };
@@ -280,6 +314,7 @@ function orderFields(order: {
   parts: PartLine[];
   status: SpkStatus;
   grand: number;
+  payMethod: PayMethod | null;
 }) {
   return {
     Pelanggan: order.customerName,
@@ -290,6 +325,7 @@ function orderFields(order: {
     Part: partsText(order.parts),
     Status: spkStatusLabel[order.status],
     Total: rupiah(order.grand),
+    "Tempat uang": order.payMethod ? payMethodLabel[order.payMethod] : "—",
   };
 }
 
@@ -1310,6 +1346,7 @@ export async function saveServiceOrder(
     laborCost: number;
     parts: { productId: string; qty: number }[];
     status: SpkStatus;
+    payMethod: PayMethod | null;
   },
   actor: ActivityActor,
 ) {
@@ -1321,6 +1358,8 @@ export async function saveServiceOrder(
   if (role === "mekanik" && !["antri", "dikerjakan", "selesai"].includes(input.status)) {
     throw new Error("Mekanik mengubah status sampai selesai.");
   }
+  const payMethod = input.status === "lunas" ? input.payMethod : null;
+  if (input.status === "lunas" && !payMethod) throw new Error("Pilih tempat uang.");
 
   const database = store();
   const customer = await database.collection("customers").doc(input.customerId).get();
@@ -1389,6 +1428,7 @@ export async function saveServiceOrder(
       parts,
       status: input.status,
       grand: partsSell + input.laborCost,
+      payMethod,
     };
 
     tx.set(ref, {
@@ -1410,6 +1450,7 @@ export async function saveServiceOrder(
       partsCost,
       grand: next.grand,
       paidDate,
+      payMethod,
       monthKey: paidDate ? monthKeyOf(paidDate) : null,
       createdAt: existing?.createdAt || new Date().toISOString(),
     });
@@ -1432,6 +1473,73 @@ export async function saveServiceOrder(
   });
 }
 
+export async function saveCustomerPayment(
+  input: {
+    day: string;
+    customerId: string;
+    payMethod: PayMethod | null;
+    amount: number;
+    note: string;
+  },
+  actor: ActivityActor,
+) {
+  if (!isBusinessDay(input.day)) throw new Error("Tanggal tidak valid.");
+  if (!input.payMethod) throw new Error("Pilih tempat uang.");
+  if (input.amount <= 0) throw new Error("Jumlah pembayaran harus lebih dari nol.");
+  const payMethod = input.payMethod;
+  const database = store();
+  const customer = await database.collection("customers").doc(input.customerId).get();
+  if (!customer.exists) throw new Error("Pelanggan tidak ditemukan.");
+  const customerName = text(customer.data()?.name);
+  const month = monthKeyOf(input.day);
+  await database.runTransaction(async (tx) => {
+    await ensureOpen(tx, month);
+    const ref = database.collection("customerPayments").doc();
+    tx.set(ref, {
+      customerId: input.customerId,
+      customerName,
+      payMethod,
+      amount: input.amount,
+      note: input.note,
+      businessDate: input.day,
+      monthKey: month,
+      createdAt: new Date().toISOString(),
+    });
+    queueActivity(tx, {
+      actor,
+      action: "buat",
+      entity: "pembayaran",
+      entityId: ref.id,
+      label: `${customerName} membayar`,
+      changes: fieldChanges(
+        {},
+        {
+          Pelanggan: customerName,
+          "Tempat uang": payMethodLabel[payMethod],
+          Jumlah: rupiah(input.amount),
+          Catatan: input.note,
+        },
+      ),
+    });
+  });
+}
+
+function mapPayment(id: string, data: FirebaseFirestore.DocumentData): CustomerPayment | null {
+  const payMethod = parsePayMethod(data.payMethod);
+  if (!payMethod) return null;
+  return {
+    id,
+    customerId: text(data.customerId),
+    customerName: text(data.customerName, "Pelanggan"),
+    payMethod,
+    amount: num(data.amount),
+    note: text(data.note),
+    businessDate: text(data.businessDate),
+    monthKey: text(data.monthKey),
+    createdAt: text(data.createdAt),
+  };
+}
+
 export async function listSales() {
   const snap = await store().collection("walkInSales").get();
   return snap.docs
@@ -1445,6 +1553,7 @@ export async function listSales() {
         total: num(data.total),
         costTotal: num(data.costTotal),
         businessDate: text(data.businessDate),
+        payMethod: parsePayMethod(data.payMethod),
         monthKey: text(data.monthKey),
         createdAt: text(data.createdAt),
       } satisfies WalkInSale;
@@ -1453,10 +1562,12 @@ export async function listSales() {
 }
 
 export async function saveWalkInSale(
-  input: { lines: { productId: string; qty: number }[] },
+  input: { lines: { productId: string; qty: number }[]; payMethod: PayMethod | null },
   actor: ActivityActor,
 ) {
   if (input.lines.length === 0) throw new Error("Pilih barang yang dijual.");
+  if (!input.payMethod) throw new Error("Pilih tempat uang.");
+  const payMethod = input.payMethod;
   const qtyByProduct = new Map<string, number>();
   for (const line of input.lines) {
     if (!line.productId || line.qty <= 0) throw new Error("Jumlah barang harus lebih dari nol.");
@@ -1495,6 +1606,7 @@ export async function saveWalkInSale(
       total,
       costTotal,
       businessDate: day,
+      payMethod,
       monthKey: month,
       createdAt: new Date().toISOString(),
     });
@@ -1505,25 +1617,34 @@ export async function saveWalkInSale(
       entityId: saleRef.id,
       label: `${no} terjual`,
       changes: [
-        ...fieldChanges({}, { Barang: partsText(lines), Total: rupiah(total) }),
+        ...fieldChanges({}, { Barang: partsText(lines), Total: rupiah(total), "Tempat uang": payMethodLabel[payMethod] }),
         ...stockChanges(snaps, delta),
       ],
     });
   });
 }
 
-export async function cashInFor(day: string) {
-  const database = store();
-  const [orders, sales] = await Promise.all([
-    database.collection("serviceOrders").where("paidDate", "==", day).get(),
-    database.collection("walkInSales").where("businessDate", "==", day).get(),
-  ]);
-  const spk = orders.docs
-    .map((doc) => mapOrder(doc.id, doc.data()))
-    .filter((order) => order.status === "lunas")
-    .reduce((sum, order) => sum + order.grand, 0);
-  const walkIn = sales.docs.reduce((sum, doc) => sum + num(doc.data().total), 0);
-  return spk + walkIn;
+function emptyChannels(): ChannelTotals {
+  return { tunai: 0, qris: 0, bank: 0, unknown: 0 };
+}
+
+function addChannel(totals: ChannelTotals, method: PayMethod | null, amount: number) {
+  if (method) totals[method] += amount;
+  else totals.unknown += amount;
+}
+
+export async function cashSnapshot(day: string): Promise<{ channels: ChannelTotals; payments: CustomerPayment[] }> {
+  const snap = await store().collection("customerPayments").where("businessDate", "==", day).get();
+  const channels = emptyChannels();
+  const payments: CustomerPayment[] = [];
+  for (const doc of snap.docs) {
+    const payment = mapPayment(doc.id, doc.data());
+    if (!payment) continue;
+    payments.push(payment);
+    addChannel(channels, payment.payMethod, payment.amount);
+  }
+  payments.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return { channels, payments };
 }
 
 export async function getCashDay(day: string): Promise<CashDay | null> {
@@ -1533,7 +1654,9 @@ export async function getCashDay(day: string): Promise<CashDay | null> {
   return {
     id: snap.id,
     cashOut: num(data.cashOut),
-    counted: data.counted === undefined || data.counted === null ? null : num(data.counted),
+    counted: optionalNum(data.counted),
+    qrisReceived: optionalNum(data.qrisReceived),
+    bankReceived: optionalNum(data.bankReceived),
     note: text(data.note),
     closedAt: data.closedAt ? text(data.closedAt) : null,
     monthKey: text(data.monthKey),
@@ -1545,10 +1668,13 @@ export async function saveCashDay(
     day: string;
     cashOut: number;
     counted: number;
+    qrisReceived: number | null;
+    bankReceived: number | null;
     note: string;
   },
   actor: ActivityActor,
 ) {
+  if (!isBusinessDay(input.day)) throw new Error("Tanggal tidak valid.");
   const month = monthKeyOf(input.day);
   const database = store();
   await database.runTransaction(async (tx) => {
@@ -1558,16 +1684,22 @@ export async function saveCashDay(
     const before = priorFields(existing.exists, {
       Pengeluaran: rupiah(num(existing.data()?.cashOut)),
       Dihitung: rupiah(num(existing.data()?.counted)),
+      "QRIS masuk": moneyLabel(optionalNum(existing.data()?.qrisReceived)),
+      "Bank masuk": moneyLabel(optionalNum(existing.data()?.bankReceived)),
       Catatan: text(existing.data()?.note),
     });
     const after = {
       Pengeluaran: rupiah(input.cashOut),
       Dihitung: rupiah(input.counted),
+      "QRIS masuk": moneyLabel(input.qrisReceived),
+      "Bank masuk": moneyLabel(input.bankReceived),
       Catatan: input.note,
     };
     tx.set(ref, {
       cashOut: input.cashOut,
       counted: input.counted,
+      qrisReceived: input.qrisReceived,
+      bankReceived: input.bankReceived,
       note: input.note,
       closedAt: new Date().toISOString(),
       monthKey: month,

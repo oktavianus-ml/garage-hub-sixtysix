@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { guard } from "@/lib/auth/guard";
 import { isRole } from "@/lib/auth/roles";
 import { bikeSelectionError } from "@/lib/data/bikes";
-import { asInt, jakartaDate } from "@/lib/data/format";
+import { asInt, isBusinessDay } from "@/lib/data/format";
+import { parsePayMethod } from "@/lib/data/payment";
 import { isSupplyUnit } from "@/lib/data/supply";
 import {
   closeMonth,
@@ -26,6 +27,7 @@ import {
   saveServiceOrder,
   saveVehicle,
   saveWalkInSale,
+  saveCustomerPayment,
   type SpkStatus,
 } from "@/lib/data/records";
 
@@ -464,6 +466,7 @@ export async function saveServiceAction(_prev: FormState, formData: FormData): P
         laborCost,
         parts,
         status,
+        payMethod: parsePayMethod(formData.get("payMethod")),
       },
       access.user,
     );
@@ -484,25 +487,31 @@ export async function saveSaleAction(_prev: FormState, formData: FormData): Prom
     return { message: "Daftar barang tidak valid." };
   }
   try {
-    await saveWalkInSale({ lines }, access.user);
+    await saveWalkInSale({ lines, payMethod: parsePayMethod(formData.get("payMethod")) }, access.user);
   } catch (error) {
     return fail(error);
   }
   redirect("/kasir");
 }
 
-export async function saveCashAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const access = await guard("/kas");
+export async function saveCustomerPaymentAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const access = await guard("/pembayaran/catat");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
-  const cashOut = asInt(formData.get("cashOut"));
-  const counted = asInt(formData.get("counted"));
-  if (cashOut === null || counted === null) return { message: "Isi pengeluaran kas dan uang yang dihitung." };
+  const day = String(formData.get("day") ?? "");
+  const customerId = String(formData.get("customerId") ?? "");
+  const payMethod = parsePayMethod(formData.get("payMethod"));
+  const amount = asInt(formData.get("amount"));
+  if (!isBusinessDay(day)) return { message: "Tanggal tidak valid." };
+  if (!customerId || !payMethod || amount === null || amount <= 0) {
+    return { message: "Pilih pelanggan, tempat uang, dan jumlah." };
+  }
   try {
-    await saveCashDay(
+    await saveCustomerPayment(
       {
-        day: jakartaDate(),
-        cashOut,
-        counted,
+        day,
+        customerId,
+        payMethod,
+        amount,
         note: String(formData.get("note") ?? "").trim(),
       },
       access.user,
@@ -510,7 +519,43 @@ export async function saveCashAction(_prev: FormState, formData: FormData): Prom
   } catch (error) {
     return fail(error);
   }
-  redirect("/kas");
+  redirect(`/pembayaran/catat?hari=${day}`);
+}
+
+function optionalMoney(value: FormDataEntryValue | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const number = asInt(value);
+  return number === null ? ("bad" as const) : number;
+}
+
+export async function saveCashAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const access = await guard("/kas");
+  if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const day = String(formData.get("day") ?? "");
+  if (!isBusinessDay(day)) return { message: "Tanggal tidak valid." };
+  const cashOut = asInt(formData.get("cashOut"));
+  const counted = asInt(formData.get("counted"));
+  const qrisReceived = optionalMoney(formData.get("qrisReceived"));
+  const bankReceived = optionalMoney(formData.get("bankReceived"));
+  if (cashOut === null || counted === null) return { message: "Isi pengeluaran dari laci dan uang tunai yang dihitung." };
+  if (qrisReceived === "bad" || bankReceived === "bad") return { message: "Isi uang yang masuk dengan angka." };
+  try {
+    await saveCashDay(
+      {
+        day,
+        cashOut,
+        counted,
+        qrisReceived,
+        bankReceived,
+        note: String(formData.get("note") ?? "").trim(),
+      },
+      access.user,
+    );
+  } catch (error) {
+    return fail(error);
+  }
+  redirect(`/kas?hari=${day}`);
 }
 
 export async function saveSplitAction(_prev: FormState, formData: FormData): Promise<FormState> {

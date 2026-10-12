@@ -4,6 +4,7 @@ import { useMemo, useState, useActionState } from "react";
 import { Receipt, ShoppingBag } from "lucide-react";
 import { saveSaleAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
+import { PAY_METHODS, payMethodLabel } from "@/lib/data/payment";
 import type { Product, WalkInSale } from "@/lib/data/records";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
@@ -91,6 +92,14 @@ export function CashierPanel({
                 );
               })}
             </ul>
+            <select name="payMethod" required className={inputClass} defaultValue="">
+              <option value="">Tempat uang</option>
+              {PAY_METHODS.map((method) => (
+                <option key={method} value={method}>
+                  {payMethodLabel[method]}
+                </option>
+              ))}
+            </select>
             <p className="text-lg font-semibold tabular-nums">{rupiah(total)}</p>
             {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
             <SaveButton pending={pending} disabled={lines.length === 0}>
@@ -113,7 +122,9 @@ export function CashierPanel({
                   {sale.no} · {sale.businessDate}
                 </p>
                 <p className="text-sm text-muted">{sale.lines.map((line) => `${line.name} × ${line.qty}`).join(", ")}</p>
-                <p className="text-sm font-semibold text-amber tabular-nums">{rupiah(sale.total)}</p>
+                <p className="text-sm font-semibold text-amber tabular-nums">
+                  {rupiah(sale.total)} · {sale.payMethod ? payMethodLabel[sale.payMethod] : "Belum dicatat"}
+                </p>
               </li>
             ))}
           </ul>

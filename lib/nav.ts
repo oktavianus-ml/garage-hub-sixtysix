@@ -7,6 +7,7 @@ import {
   FileSpreadsheet,
   HardHat,
   History,
+  Banknote,
   LayoutDashboard,
   List,
   Package,
@@ -180,10 +181,24 @@ export const navGroups: NavGroup[] = [
     label: "Keuangan",
     items: [
       {
-        label: "Kas harian",
-        href: "/kas",
-        icon: Wallet,
-        description: "Uang masuk hari ini, pengeluaran kas, dan tutup kas.",
+        label: "Pembayaran",
+        href: "/pembayaran",
+        icon: Banknote,
+        description: "Catat pembayaran pelanggan, lalu pantau uang yang benar-benar masuk.",
+        children: [
+          {
+            label: "Catat",
+            href: "/pembayaran/catat",
+            icon: ClipboardPen,
+            description: "Catat tiap pelanggan beserta tempat uang dan jumlah yang dibayar.",
+          },
+          {
+            label: "Pantauan",
+            href: "/kas",
+            icon: Wallet,
+            description: "Pantau tunai, QRIS, dan rekening bank terhadap uang yang benar-benar masuk.",
+          },
+        ],
       },
       {
         label: "Laporan",

@@ -10,6 +10,7 @@ const shared: Record<string, Access> = {
   "/produk": "none",
   "/inventori": "none",
   "/kas": "none",
+  "/pembayaran": "none",
   "/bagi-hasil": "none",
 };
 
@@ -26,6 +27,7 @@ const byRole: Record<Role, Record<string, Access>> = {
     "/pembelian": "read",
     "/pengadaan": "read",
     "/kas": "read",
+    "/pembayaran": "read",
     "/bagi-hasil": "read",
   },
   kasir: {
@@ -36,6 +38,7 @@ const byRole: Record<Role, Record<string, Access>> = {
     "/produk": "read",
     "/inventori": "read",
     "/kas": "write",
+    "/pembayaran": "write",
     "/pengadaan": "write",
   },
   gudang: {
@@ -59,6 +62,7 @@ function accessKey(href: string) {
   if (href === "/pembelian" || href.startsWith("/pembelian/")) return "/pembelian";
   if (href === "/pengadaan" || href.startsWith("/pengadaan/")) return "/pengadaan";
   if (href === "/pelanggan" || href.startsWith("/pelanggan/")) return "/pelanggan";
+  if (href === "/pembayaran" || href.startsWith("/pembayaran/")) return "/pembayaran";
   return href;
 }
 
@@ -90,6 +94,8 @@ export function allowedHrefs(role: Role) {
     "/pengadaan/persetujuan",
     "/pengadaan/penerimaan",
     "/kas",
+    "/pembayaran",
+    "/pembayaran/catat",
     "/laporan",
     "/bagi-hasil",
     "/audit",
