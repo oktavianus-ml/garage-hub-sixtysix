@@ -22,13 +22,14 @@ export function labeledPartners<T extends { name: string }>(rows: T[]) {
   });
 }
 
-export function splitError(partners: ProfitPartner[]) {
+export function splitError(partners: ProfitPartner[], allowedIds?: ReadonlySet<string>) {
   if (partners.length < 1) return "Tambah minimal satu orang.";
   if (partners.length > MAX_PARTNERS) return "Maksimal 10 orang.";
   const ids = new Set<string>();
   for (const partner of partners) {
     const id = partner.id.trim();
-    if (!id || ids.has(id)) return "Data orang tidak lengkap.";
+    if (!id || (allowedIds && !allowedIds.has(id))) return "Pilih orang dari daftar pegawai.";
+    if (ids.has(id)) return "Orang ini sudah dipilih.";
     ids.add(id);
     if (!partner.name.trim()) return "Isi nama tiap orang.";
     if (!Number.isInteger(partner.percent) || partner.percent < 0 || partner.percent > 100) {

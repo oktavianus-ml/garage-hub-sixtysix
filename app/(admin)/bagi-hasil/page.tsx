@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { buttonClass, inputClass } from "@/components/ui/controls";
 import { guard } from "@/lib/auth/guard";
 import { jakartaDate, monthKeyOf } from "@/lib/data/format";
-import { previewMonth } from "@/lib/data/records";
+import { listStaff, previewMonth } from "@/lib/data/records";
 
 export const metadata = { title: "Bagi hasil" };
 
@@ -16,8 +16,9 @@ export default async function BagiHasilPage({
   const params = await searchParams;
   const month =
     params.bulan && /^\d{4}-\d{2}$/.test(params.bulan) ? params.bulan : monthKeyOf(jakartaDate());
-  const preview = await previewMonth(month);
+  const [preview, staff] = await Promise.all([previewMonth(month), listStaff()]);
   const shareKey = preview.shares.map((share) => `${share.id}:${share.name}:${share.percent}`).join("|");
+  const people = staff.map((user) => ({ id: user.id, name: user.name, role: user.role }));
 
   return (
     <div>
@@ -30,7 +31,13 @@ export default async function BagiHasilPage({
         <input type="month" name="bulan" defaultValue={month} className={inputClass} />
         <button className={buttonClass}>Lihat</button>
       </form>
-      <ProfitPanel key={`${month}:${shareKey}`} month={month} canWrite={canWrite} {...preview} />
+      <ProfitPanel
+        key={`${month}:${shareKey}:${people.map((person) => person.id).join(",")}`}
+        month={month}
+        canWrite={canWrite}
+        people={people}
+        {...preview}
+      />
     </div>
   );
 }

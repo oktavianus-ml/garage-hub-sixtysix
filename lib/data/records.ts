@@ -1733,12 +1733,14 @@ export async function getProfitSplit(): Promise<ProfitSplit> {
 }
 
 export async function saveProfitSplit(split: ProfitSplit, actor: ActivityActor) {
+  const staff = await listStaff();
+  const names = new Map(staff.map((user) => [user.id, user.name]));
   const partners = split.partners.map((partner) => ({
     id: partner.id.trim(),
-    name: partner.name.trim(),
+    name: names.get(partner.id.trim()) ?? "",
     percent: partner.percent,
   }));
-  const message = splitError(partners);
+  const message = splitError(partners, new Set(names.keys()));
   if (message) throw new Error(message);
   const ref = store().doc("settings/profitSplit");
   const existing = await ref.get();

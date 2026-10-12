@@ -565,15 +565,14 @@ export async function saveSplitAction(_prev: FormState, formData: FormData): Pro
   const access = await guard("/bagi-hasil");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const ids = formData.getAll("partnerId");
-  const names = formData.getAll("partnerName");
   const percents = formData.getAll("partnerPercent");
-  if (ids.length === 0 || ids.length !== names.length || ids.length !== percents.length) {
+  if (ids.length === 0 || ids.length !== percents.length) {
     return { message: "Data orang tidak lengkap." };
   }
   const partners = ids.map((id, index) => {
     const raw = String(percents[index] ?? "").trim();
     const percent = /^\d+$/.test(raw) ? Number(raw) : Number.NaN;
-    return { id: String(id), name: String(names[index] ?? ""), percent };
+    return { id: String(id), name: "", percent };
   });
   try {
     await saveProfitSplit({ partners }, access.user);
