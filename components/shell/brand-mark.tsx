@@ -12,11 +12,8 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
       >
         66
       </span>
-      <span className={cn("min-w-0", compact && "sr-only")}>
-        <span className="block truncate text-sm font-semibold leading-tight">
-          GarageHub
-        </span>
-        <span className="block truncate text-xs text-muted">Pit Amber</span>
+      <span className={cn("min-w-0 truncate text-xl font-semibold tracking-tight", compact && "sr-only")}>
+        GarageHub
       </span>
     </div>
   );
