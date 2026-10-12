@@ -1,41 +1,47 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f3f0e8;
-  --bg-elevated: rgba(255, 255, 255, 0.72);
-  --bg-solid: rgba(255, 252, 247, 0.94);
+  --bg: #f3eee4;
+  --bg-elevated: rgba(255, 252, 247, 0.96);
+  --bg-solid: rgba(255, 252, 247, 0.98);
+  --bg-rail: #faf7f1;
+  --bg-field: #ffffff;
   --ink: #1c1915;
   --ink-muted: #6b6560;
-  --line: rgba(28, 25, 21, 0.1);
+  --line: rgba(28, 25, 21, 0.16);
+  --line-strong: rgba(28, 25, 21, 0.24);
   --amber: #c4840a;
-  --amber-soft: rgba(196, 132, 10, 0.14);
+  --amber-soft: rgba(196, 132, 10, 0.16);
   --teal: #0e7c74;
-  --teal-soft: rgba(14, 124, 116, 0.12);
+  --teal-soft: rgba(14, 124, 116, 0.14);
   --danger: #c2413b;
   --danger-soft: rgba(194, 65, 59, 0.12);
-  --chip: rgba(255, 255, 255, 0.45);
-  --glow-amber: rgba(196, 132, 10, 0.2);
-  --glow-teal: rgba(14, 124, 116, 0.14);
-  --shadow: 0 10px 30px rgba(28, 25, 21, 0.06);
+  --chip: rgba(255, 255, 255, 0.55);
+  --glow-amber: rgba(196, 132, 10, 0.16);
+  --glow-teal: rgba(14, 124, 116, 0.1);
+  --shadow: 0 10px 30px rgba(28, 25, 21, 0.07);
   color-scheme: light;
 }
 
 .dark {
   --bg: #101214;
-  --bg-elevated: rgba(255, 255, 255, 0.06);
-  --bg-solid: rgba(22, 25, 29, 0.94);
+  --bg-elevated: rgba(28, 32, 36, 0.94);
+  --bg-solid: rgba(22, 25, 29, 0.98);
+  --bg-rail: #16191d;
+  --bg-field: #22262c;
   --ink: #f6f3ec;
   --ink-muted: #a39e96;
-  --line: rgba(255, 255, 255, 0.12);
+  --line: rgba(255, 255, 255, 0.18);
+  --line-strong: rgba(255, 255, 255, 0.28);
   --amber: #f5b942;
   --amber-soft: rgba(245, 185, 66, 0.16);
   --teal: #3dcfc2;
   --teal-soft: rgba(61, 207, 194, 0.14);
   --danger: #f07167;
   --danger-soft: rgba(240, 113, 103, 0.16);
-  --chip: rgba(255, 255, 255, 0.06);
-  --glow-amber: rgba(245, 185, 66, 0.18);
-  --glow-teal: rgba(61, 207, 194, 0.12);
+  --chip: rgba(255, 255, 255, 0.08);
+  --glow-amber: rgba(245, 185, 66, 0.14);
+  --glow-teal: rgba(61, 207, 194, 0.1);
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   color-scheme: dark;
 }
@@ -43,9 +49,12 @@
 @theme inline {
   --color-bg: var(--bg);
   --color-elevated: var(--bg-elevated);
+  --color-rail: var(--bg-rail);
+  --color-field: var(--bg-field);
   --color-ink: var(--ink);
   --color-muted: var(--ink-muted);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-amber: var(--amber);
   --color-amber-soft: var(--amber-soft);
   --color-teal: var(--teal);
@@ -58,10 +67,7 @@
 
 body {
   min-height: 100dvh;
-  background:
-    radial-gradient(900px 520px at 100% -10%, var(--glow-amber), transparent 55%),
-    radial-gradient(720px 440px at -8% 108%, var(--glow-teal), transparent 50%),
-    var(--bg);
+  background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;

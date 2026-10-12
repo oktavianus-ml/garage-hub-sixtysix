@@ -17,7 +17,8 @@ export function PageHeader({
           </span>
         ) : null}
       </div>
-      <p className="mt-1 max-w-2xl text-sm leading-6 text-muted">{description}</p>
+      <span className="mt-2 block h-0.5 w-10 rounded-full bg-amber" aria-hidden />
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{description}</p>
     </header>
   );
 }

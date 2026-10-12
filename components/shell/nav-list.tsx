@@ -29,10 +29,11 @@ export function NavList({
         <div key={group.label}>
           <p
             className={cn(
-              "mb-1 px-3 text-[11px] font-semibold tracking-[0.14em] text-muted uppercase",
+              "mb-1 flex items-center gap-2 px-3 text-[11px] font-semibold tracking-[0.14em] text-muted uppercase",
               !showLabels && "sr-only",
             )}
           >
+            <span className="h-px w-3 shrink-0 bg-amber" aria-hidden />
             {group.label}
           </p>
           <ul className="flex flex-col gap-1">
@@ -46,9 +47,11 @@ export function NavList({
                     onClick={onNavigate}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex min-h-11 items-center gap-3 rounded-xl text-sm font-medium transition-colors",
+                      "flex min-h-11 items-center gap-3 rounded-xl border-l-[3px] text-sm font-medium transition-colors",
                       showLabels ? "px-3" : "justify-center px-0",
-                      active ? "bg-amber-soft text-amber" : "text-ink hover-wash",
+                      active
+                        ? "border-amber bg-amber-soft text-amber"
+                        : "border-transparent text-ink hover-wash",
                     )}
                   >
                     <Icon className="size-5 shrink-0" aria-hidden />

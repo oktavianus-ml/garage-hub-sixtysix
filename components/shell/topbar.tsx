@@ -27,7 +27,7 @@ export function Topbar({
             {current?.label ?? "GarageHub"}
           </p>
           <div
-            className="hidden h-11 min-w-0 max-w-md flex-1 items-center gap-2 rounded-xl border border-line bg-chip px-3 text-sm text-muted xl:flex"
+            className="hidden h-11 min-w-0 max-w-md flex-1 items-center gap-2 rounded-xl border border-line-strong bg-field px-3 text-sm text-muted xl:flex"
             aria-hidden="true"
           >
             <Search className="size-4 shrink-0" />

@@ -15,6 +15,14 @@ const labels: Record<SpkStatus, string> = {
   batal: "Batal",
 };
 
+const statusClass: Record<SpkStatus, string> = {
+  antri: "bg-amber-soft text-amber",
+  dikerjakan: "bg-teal-soft text-teal",
+  selesai: "bg-chip text-ink",
+  lunas: "bg-teal-soft text-teal",
+  batal: "bg-danger-soft text-danger",
+};
+
 export function ServicePanel({
   orders,
   customers,
@@ -53,7 +61,7 @@ export function ServicePanel({
   return (
     <div className="mt-5 grid gap-4 xl:grid-cols-2">
       {canWrite ? (
-        <GlassCard className="p-4">
+        <GlassCard accent className="p-4">
           <h2 className="text-base font-semibold">{editing ? editing.no : "SPK baru"}</h2>
           {locked ? (
             <p className="mt-3 text-sm text-muted">SPK ini tidak bisa diubah dari peran ini.</p>
@@ -186,8 +194,11 @@ export function ServicePanel({
           <ul className="mt-2 divide-y divide-line">
             {orders.map((order) => (
               <li key={order.id} className="py-3">
-                <a href={`/service?id=${order.id}`} className="font-medium">
-                  {order.no} · {labels[order.status]}
+                <a href={`/service?id=${order.id}`} className="inline-flex flex-wrap items-center gap-2 font-medium">
+                  {order.no}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusClass[order.status]}`}>
+                    {labels[order.status]}
+                  </span>
                 </a>
                 <p className="text-sm text-muted">
                   {order.customerName} · {order.plate} · {order.mechanicName}

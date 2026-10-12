@@ -30,7 +30,7 @@ export function CashierPanel({
   return (
     <div className="mt-5 grid gap-4 xl:grid-cols-2">
       {canWrite ? (
-        <GlassCard className="p-4">
+        <GlassCard accent className="p-4">
           <h2 className="text-base font-semibold">Jual sparepart</h2>
           <form action={action} className="mt-3 flex flex-col gap-3">
             <input type="hidden" name="lines" value={JSON.stringify(lines)} />

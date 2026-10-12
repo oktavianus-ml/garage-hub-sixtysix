@@ -87,7 +87,7 @@ export function LoginForm({
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-4 py-10">
       <BrandMark />
-      <GlassCard className="mt-6 p-5">
+      <GlassCard accent className="mt-6 p-5">
         <h1 className="text-2xl font-semibold tracking-tight">Masuk</h1>
         <p className="mt-1 text-sm leading-6 text-muted">
           Pakai email dan kata sandi akun bengkel.
@@ -108,7 +108,7 @@ export function LoginForm({
               disabled={blocked || pending}
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              className="h-11 rounded-xl border border-line bg-chip px-3 text-base font-normal"
+              className="h-11 rounded-xl border border-line-strong bg-field px-3 text-base font-normal"
             />
           </label>
           <label className="flex flex-col gap-1 text-sm font-medium">
@@ -121,7 +121,7 @@ export function LoginForm({
               disabled={blocked || pending}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="h-11 rounded-xl border border-line bg-chip px-3 text-base font-normal"
+              className="h-11 rounded-xl border border-line-strong bg-field px-3 text-base font-normal"
             />
           </label>
           {error ? <p className="text-sm text-danger">{error}</p> : null}

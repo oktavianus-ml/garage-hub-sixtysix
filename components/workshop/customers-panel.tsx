@@ -21,7 +21,7 @@ export function CustomersPanel({
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-2">
       {canWrite ? (
-        <GlassCard className="p-4">
+        <GlassCard accent className="p-4">
           <h2 className="text-base font-semibold">Pelanggan baru</h2>
           <form action={customerAction} className="mt-3 flex flex-col gap-3">
             <input name="name" required placeholder="Nama" className={inputClass} />
@@ -34,7 +34,7 @@ export function CustomersPanel({
         </GlassCard>
       ) : null}
       {canWrite ? (
-        <GlassCard className="p-4">
+        <GlassCard accent className="p-4">
           <h2 className="text-base font-semibold">Motor pelanggan</h2>
           <form action={vehicleAction} className="mt-3 flex flex-col gap-3">
             <select name="customerId" required className={inputClass} defaultValue="">

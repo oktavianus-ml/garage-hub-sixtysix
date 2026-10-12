@@ -12,7 +12,7 @@ export function StaffPanel({ staff }: { staff: StaffUser[] }) {
 
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-2">
-      <GlassCard className="p-4">
+      <GlassCard accent className="p-4">
         <h2 className="text-base font-semibold">Pegawai baru</h2>
         <p className="mt-1 text-sm text-muted">Masuk dengan email dan kata sandi ini.</p>
         <form action={action} className="mt-3 flex flex-col gap-3">

@@ -19,7 +19,7 @@ export function ProductsPanel({
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-2">
       {canWrite ? (
-        <GlassCard className="p-4">
+        <GlassCard accent className="p-4">
           <h2 className="text-base font-semibold">Produk</h2>
           <form action={action} className="mt-3 grid gap-3 sm:grid-cols-2">
             <input name="name" required placeholder="Nama barang" className={`${inputClass} sm:col-span-2`} />

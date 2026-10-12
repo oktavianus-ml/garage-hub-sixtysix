@@ -51,7 +51,7 @@ export function CashPanel({
         <p className="mt-3 text-xs text-muted">Uang masuk dari SPK lunas dan kasir walk-in hari ini.</p>
       </GlassCard>
       {canWrite ? (
-        <GlassCard className="p-4">
+        <GlassCard accent className="p-4">
           <h2 className="text-base font-semibold">Tutup kas</h2>
           {monthClosed ? (
             <p className="mt-3 text-sm text-muted">Bulan ini sudah ditutup.</p>

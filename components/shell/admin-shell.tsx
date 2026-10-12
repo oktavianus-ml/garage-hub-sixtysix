@@ -35,7 +35,7 @@ export function AdminShell({
 
   return (
     <div className="min-h-dvh">
-      <aside className="glass glass-chrome fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-y-0 border-l-0 xl:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-line bg-rail xl:flex">
         <div className="flex h-16 items-center px-4">
           <BrandMark />
         </div>
@@ -55,7 +55,7 @@ export function AdminShell({
 
       <aside
         className={cn(
-          "glass glass-chrome fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden border-y-0 border-l-0 transition-[width] duration-200 ease-out md:flex xl:hidden",
+          "fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden border-r border-line bg-rail transition-[width] duration-200 ease-out md:flex xl:hidden",
           railOpen ? "w-[248px]" : "w-[72px]",
         )}
       >
