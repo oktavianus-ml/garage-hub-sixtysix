@@ -10,6 +10,7 @@ import {
 } from "@/lib/data/activity";
 import { jakartaDate, monthKeyOf, rupiah } from "@/lib/data/format";
 import { PURCHASE_STATUSES, purchaseStatusLabel, type PurchaseStatus } from "@/lib/data/purchase";
+import { isSupplyUnit } from "@/lib/data/supply";
 import { heldQty, holdDelta, type HeldPart } from "@/lib/data/stock";
 
 export type Customer = { id: string; name: string; phone: string };
@@ -66,21 +67,35 @@ export type Purchase = {
   createdAt: string;
   orderedAt: string | null;
 };
+export type SupplyItem = {
+  id: string;
+  name: string;
+  unit: string;
+  cost: number;
+};
 export type ProcurementLine = {
+  itemId: string;
   name: string;
   unit: string;
   qty: number;
   cost: number;
+  received: number;
+};
+export type ProcurementReceipt = {
+  at: string;
+  lines: { itemId: string; name: string; qty: number }[];
 };
 export type Procurement = {
   id: string;
   no: string;
   vendor: string;
+  status: PurchaseStatus;
   note: string;
-  boughtOn: string;
   lines: ProcurementLine[];
+  receipts: ProcurementReceipt[];
   total: number;
   createdAt: string;
+  orderedAt: string | null;
 };
 export type StaffUser = {
   id: string;
@@ -875,85 +890,163 @@ export async function receivePurchase(
   });
 }
 
-const DAY = /^\d{4}-\d{2}-\d{2}$/;
-
-function isCalendarDay(value: string) {
-  if (!DAY.test(value)) return false;
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
-
 function mapProcurementLines(value: unknown): ProcurementLine[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
     if (!item || typeof item !== "object") return [];
     const row = item as Record<string, unknown>;
+    const itemId = text(row.itemId);
     const name = text(row.name);
-    if (!name) return [];
+    if (!itemId || !name) return [];
     return [
       {
+        itemId,
         name,
         unit: text(row.unit, "pcs"),
         qty: num(row.qty),
         cost: num(row.cost),
+        received: num(row.received),
       },
     ];
   });
 }
 
-function mapProcurement(id: string, data: FirebaseFirestore.DocumentData): Procurement {
+function mapProcurementReceipts(value: unknown): ProcurementReceipt[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const lines = mapProcurementLines(row.lines).map((line) => ({
+      itemId: line.itemId,
+      name: line.name,
+      qty: line.qty,
+    }));
+    return [{ at: text(row.at), lines }];
+  });
+}
+
+function mapProcurement(id: string, data: FirebaseFirestore.DocumentData): Procurement | null {
   const lines = mapProcurementLines(data.lines);
+  if (lines.length === 0) return null;
+  const status = PURCHASE_STATUSES.includes(data.status) ? data.status : "diminta";
   return {
     id,
     no: text(data.no),
     vendor: text(data.vendor),
+    status,
     note: text(data.note),
-    boughtOn: text(data.boughtOn),
     lines,
+    receipts: mapProcurementReceipts(data.receipts),
     total: lines.reduce((sum, line) => sum + line.qty * line.cost, 0),
     createdAt: text(data.createdAt),
+    orderedAt: data.orderedAt ? text(data.orderedAt) : null,
   };
 }
 
 function procurementFields(record: {
   vendor: string;
-  boughtOn: string;
   lines: ProcurementLine[];
+  status: PurchaseStatus;
   total: number;
   note: string;
 }) {
   return {
     Toko: record.vendor,
-    Tanggal: record.boughtOn,
-    Barang: record.lines.map((line) => `${line.name} ×${line.qty} ${line.unit}`).join(", "),
+    Barang: record.lines.map((line) => `${line.name} ×${line.qty}`).join(", "),
+    Status: purchaseStatusLabel[record.status],
     Total: rupiah(record.total),
     Catatan: record.note,
   };
 }
 
-function cleanProcurementLines(lines: ProcurementLine[]) {
-  if (lines.length === 0 || lines.length > 40) throw new Error("Tambah barang yang dibeli.");
-  return lines.map((line) => {
-    const name = line.name.trim();
-    const unit = line.unit.trim() || "pcs";
-    if (name.length < 2 || name.length > 80) throw new Error("Isi nama barang.");
-    if (unit.length > 20) throw new Error("Satuan terlalu panjang.");
-    if (!Number.isInteger(line.qty) || line.qty <= 0 || line.qty > 100000) {
+function mergeSupplyLines(lines: { itemId: string; qty: number; cost: number }[]) {
+  if (lines.length === 0) throw new Error("Tambah barang yang dibeli.");
+  const merged = new Map<string, { qty: number; cost: number }>();
+  for (const line of lines) {
+    if (!line.itemId || !Number.isInteger(line.qty) || line.qty <= 0 || line.qty > 100000) {
       throw new Error("Jumlah barang harus lebih dari nol.");
     }
     if (!Number.isInteger(line.cost) || line.cost < 0 || line.cost > 1_000_000_000) {
       throw new Error("Harga beli tidak valid.");
     }
-    return { name, unit, qty: line.qty, cost: line.cost };
+    const previous = merged.get(line.itemId);
+    if (previous && previous.cost !== line.cost) throw new Error("Harga beli satu barang harus sama.");
+    merged.set(line.itemId, { qty: (previous?.qty ?? 0) + line.qty, cost: line.cost });
+  }
+  return merged;
+}
+
+export async function listSupplyItems() {
+  const snap = await store().collection("supplyItems").get();
+  return snap.docs
+    .map((doc) => ({
+      id: doc.id,
+      name: text(doc.data().name),
+      unit: text(doc.data().unit, "pcs"),
+      cost: num(doc.data().cost),
+    }))
+    .filter((item) => item.name)
+    .sort((a, b) => a.name.localeCompare(b.name, "id"));
+}
+
+export async function saveSupplyItem(
+  input: { id?: string; name: string; unit: string; cost: number },
+  actor: ActivityActor,
+) {
+  const name = input.name.trim();
+  const unit = input.unit.trim();
+  if (name.length < 2 || name.length > 80) throw new Error("Isi nama barang.");
+  if (!isSupplyUnit(unit)) throw new Error("Pilih satuan barang.");
+  if (!Number.isInteger(input.cost) || input.cost < 0 || input.cost > 1_000_000_000) {
+    throw new Error("Harga beli tidak valid.");
+  }
+  const database = store();
+  await database.runTransaction(async (tx) => {
+    const ref = input.id ? database.collection("supplyItems").doc(input.id) : database.collection("supplyItems").doc();
+    const existingSnap = input.id ? await tx.get(ref) : null;
+    if (input.id && !existingSnap?.exists) throw new Error("Barang tidak ditemukan.");
+    const catalog = await tx.get(database.collection("supplyItems"));
+    const clash = catalog.docs.find(
+      (doc) => doc.id !== ref.id && text(doc.data().name).toLowerCase() === name.toLowerCase(),
+    );
+    if (clash) throw new Error("Barang ini sudah terdaftar.");
+    const before = priorFields(Boolean(existingSnap?.exists), {
+      Nama: text(existingSnap?.data()?.name),
+      Satuan: text(existingSnap?.data()?.unit),
+      "Harga beli": rupiah(num(existingSnap?.data()?.cost)),
+    });
+    const after = { Nama: name, Satuan: unit, "Harga beli": rupiah(input.cost) };
+    tx.set(ref, { name, unit, cost: input.cost }, { merge: true });
+    queueActivity(tx, {
+      actor,
+      action: existingSnap?.exists ? "ubah" : "buat",
+      entity: "pengadaan",
+      entityId: ref.id,
+      label: existingSnap?.exists ? `${name} diubah` : `${name} didaftarkan`,
+      changes: fieldChanges(before, after),
+    });
   });
 }
 
 export async function listProcurements() {
   const snap = await store().collection("procurements").get();
   return snap.docs
-    .map((doc) => mapProcurement(doc.id, doc.data()))
-    .sort((a, b) => b.boughtOn.localeCompare(a.boughtOn) || b.createdAt.localeCompare(a.createdAt));
+    .flatMap((doc) => {
+      const record = mapProcurement(doc.id, doc.data());
+      return record ? [record] : [];
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function procurementQueueCounts() {
+  const records = await listProcurements();
+  const menunggu = records.filter((item) => item.status === "diminta").length;
+  const datang = records.filter((item) => item.status === "dipesan" || item.status === "sebagian").length;
+  return {
+    "/pengadaan/permintaan": menunggu,
+    "/pengadaan/persetujuan": menunggu,
+    "/pengadaan/penerimaan": datang,
+  };
 }
 
 export async function saveProcurement(
@@ -961,8 +1054,7 @@ export async function saveProcurement(
     id?: string;
     vendor: string;
     note: string;
-    boughtOn: string;
-    lines: ProcurementLine[];
+    lines: { itemId: string; qty: number; cost: number }[];
   },
   actor: ActivityActor,
 ) {
@@ -970,10 +1062,7 @@ export async function saveProcurement(
   const note = input.note.trim();
   if (vendor.length < 2 || vendor.length > 80) throw new Error("Isi nama toko.");
   if (note.length > 200) throw new Error("Catatan terlalu panjang.");
-  if (!isCalendarDay(input.boughtOn) || input.boughtOn > jakartaDate()) {
-    throw new Error("Tanggal beli tidak valid.");
-  }
-  const lines = cleanProcurementLines(input.lines);
+  const merged = mergeSupplyLines(input.lines);
   const database = store();
   await database.runTransaction(async (tx) => {
     const ref = input.id
@@ -982,29 +1071,164 @@ export async function saveProcurement(
     const existingSnap = input.id ? await tx.get(ref) : null;
     const existing = existingSnap?.exists ? mapProcurement(existingSnap.id, existingSnap.data() ?? {}) : null;
     if (input.id && !existing) throw new Error("Pengadaan tidak ditemukan.");
-    await ensureOpen(tx, monthKeyOf(input.boughtOn));
-    if (existing && monthKeyOf(existing.boughtOn) !== monthKeyOf(input.boughtOn)) {
-      await ensureOpen(tx, monthKeyOf(existing.boughtOn));
+    if (existing && existing.status !== "diminta") {
+      throw new Error("Pesanan yang sudah disetujui tidak bisa diubah.");
     }
+    const itemSnaps = [];
+    for (const itemId of merged.keys()) {
+      itemSnaps.push(await tx.get(database.collection("supplyItems").doc(itemId)));
+    }
+    const lines: ProcurementLine[] = itemSnaps.map((snap) => {
+      if (!snap.exists) throw new Error("Barang tidak ditemukan. Daftarkan dulu di menu Barang.");
+      const row = merged.get(snap.id);
+      return {
+        itemId: snap.id,
+        name: text(snap.data()?.name, "Barang"),
+        unit: text(snap.data()?.unit, "pcs"),
+        qty: row?.qty ?? 0,
+        cost: row?.cost ?? 0,
+        received: 0,
+      };
+    });
     const no = existing?.no || (await takeNumber(tx, "PG"));
     const total = lines.reduce((sum, line) => sum + line.qty * line.cost, 0);
-    const next = { vendor, boughtOn: input.boughtOn, lines, total, note };
+    const next = { vendor, lines, status: "diminta" as const, total, note };
     tx.set(ref, {
       no,
       vendor,
+      status: "diminta",
       note,
-      boughtOn: input.boughtOn,
       lines,
+      receipts: existing?.receipts ?? [],
       total,
       createdAt: existing?.createdAt || new Date().toISOString(),
+      orderedAt: null,
     });
+    for (const snap of itemSnaps) {
+      const row = merged.get(snap.id);
+      if (snap.exists && row && num(snap.data()?.cost) !== row.cost) {
+        tx.update(snap.ref, { cost: row.cost });
+      }
+    }
     queueActivity(tx, {
       actor,
       action: existing ? "ubah" : "buat",
       entity: "pengadaan",
       entityId: ref.id,
-      label: existing ? `${no} diubah` : `${no} dibeli di ${vendor}`,
+      label: existing ? `${no} diubah` : `${no} diminta ke ${vendor}`,
       changes: fieldChanges(existing ? procurementFields(existing) : {}, procurementFields(next)),
+    });
+  });
+}
+
+export async function placeProcurement(id: string, actor: ActivityActor) {
+  if (!canPlacePurchase(actor.role)) {
+    throw new Error("Hanya pemilik yang menyetujui permintaan.");
+  }
+  const database = store();
+  await database.runTransaction(async (tx) => {
+    const ref = database.collection("procurements").doc(id);
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error("Pengadaan tidak ditemukan.");
+    const record = mapProcurement(snap.id, snap.data() ?? {});
+    if (!record) throw new Error("Pengadaan tidak ditemukan.");
+    if (record.status !== "diminta") throw new Error("Hanya permintaan yang bisa disetujui.");
+    if (record.vendor.length < 2) throw new Error("Isi nama toko dulu.");
+    tx.update(ref, { status: "dipesan", orderedAt: new Date().toISOString() });
+    queueActivity(tx, {
+      actor,
+      action: "ubah",
+      entity: "pengadaan",
+      entityId: id,
+      label: `${record.no} disetujui ke ${record.vendor}`,
+      changes: fieldChanges({ Status: purchaseStatusLabel.diminta }, { Status: purchaseStatusLabel.dipesan }),
+    });
+  });
+}
+
+export async function cancelProcurement(id: string, actor: ActivityActor) {
+  const database = store();
+  await database.runTransaction(async (tx) => {
+    const ref = database.collection("procurements").doc(id);
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error("Pengadaan tidak ditemukan.");
+    const record = mapProcurement(snap.id, snap.data() ?? {});
+    if (!record) throw new Error("Pengadaan tidak ditemukan.");
+    if (record.status !== "diminta" && record.status !== "dipesan") {
+      throw new Error("Pesanan ini tidak bisa dibatalkan.");
+    }
+    if (record.lines.some((line) => line.received > 0)) {
+      throw new Error("Barang yang sudah diterima tidak bisa dibatalkan.");
+    }
+    if (record.status === "dipesan" && !canPlacePurchase(actor.role)) {
+      throw new Error("Hanya pemilik yang membatalkan pesanan.");
+    }
+    tx.update(ref, { status: "batal" });
+    queueActivity(tx, {
+      actor,
+      action: "ubah",
+      entity: "pengadaan",
+      entityId: id,
+      label: `${record.no} dibatalkan`,
+      changes: fieldChanges(
+        { Status: purchaseStatusLabel[record.status] },
+        { Status: purchaseStatusLabel.batal },
+      ),
+    });
+  });
+}
+
+export async function receiveProcurement(
+  id: string,
+  inputLines: { itemId: string; qty: number }[],
+  actor: ActivityActor,
+) {
+  const qtyByItem = new Map<string, number>();
+  for (const line of inputLines) {
+    if (!line.itemId || !Number.isInteger(line.qty) || line.qty <= 0) continue;
+    qtyByItem.set(line.itemId, (qtyByItem.get(line.itemId) ?? 0) + line.qty);
+  }
+  if (qtyByItem.size === 0) throw new Error("Isi jumlah barang yang datang.");
+  const database = store();
+  await database.runTransaction(async (tx) => {
+    const ref = database.collection("procurements").doc(id);
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error("Pengadaan tidak ditemukan.");
+    const record = mapProcurement(snap.id, snap.data() ?? {});
+    if (!record) throw new Error("Pengadaan tidak ditemukan.");
+    if (record.status !== "dipesan" && record.status !== "sebagian") {
+      throw new Error("Barang diterima dari pesanan yang sudah disetujui.");
+    }
+    const nextLines = record.lines.map((line) => ({ ...line }));
+    const receiptLines: ProcurementReceipt["lines"] = [];
+    for (const [itemId, qty] of qtyByItem) {
+      const line = nextLines.find((item) => item.itemId === itemId);
+      if (!line) throw new Error("Barang ini tidak ada di pesanan.");
+      const remaining = line.qty - line.received;
+      if (qty > remaining) throw new Error(`Jumlah ${line.name} melebihi sisa pesanan.`);
+      line.received += qty;
+      receiptLines.push({ itemId, name: line.name, qty });
+    }
+    const status: PurchaseStatus = nextLines.every((line) => line.received >= line.qty) ? "diterima" : "sebagian";
+    tx.update(ref, {
+      lines: nextLines,
+      status,
+      receipts: [...record.receipts, { at: new Date().toISOString(), lines: receiptLines }],
+    });
+    const qtyTotal = receiptLines.reduce((sum, line) => sum + line.qty, 0);
+    queueActivity(tx, {
+      actor,
+      action: "ubah",
+      entity: "pengadaan",
+      entityId: id,
+      label: status === "diterima" ? `${record.no} diterima lengkap` : `${record.no} menerima ${qtyTotal} barang`,
+      changes: fieldChanges(
+        { Status: purchaseStatusLabel[record.status] },
+        {
+          Status: purchaseStatusLabel[status],
+          Datang: receiptLines.map((line) => `${line.name} ×${line.qty}`).join(", "),
+        },
+      ),
     });
   });
 }

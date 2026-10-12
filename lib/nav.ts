@@ -11,6 +11,7 @@ import {
   List,
   Package,
   PackageCheck,
+  PackagePlus,
   PieChart,
   Scale,
   ScrollText,
@@ -145,8 +146,33 @@ export const navGroups: NavGroup[] = [
         label: "Pengadaan barang",
         href: "/pengadaan",
         icon: ScrollText,
-        description:
-          "Perlengkapan di luar stok jual, seperti kertas struk dan lakban.",
+        description: "Perlengkapan di luar stok jual, dari daftar barang sampai diterima.",
+        children: [
+          {
+            label: "Barang",
+            href: "/pengadaan/barang",
+            icon: PackagePlus,
+            description: "Daftarkan perlengkapan sekali, lalu pilih lagi saat order.",
+          },
+          {
+            label: "Permintaan",
+            href: "/pengadaan/permintaan",
+            icon: ClipboardPen,
+            description: "Usulan perlengkapan yang akan dibeli.",
+          },
+          {
+            label: "Persetujuan",
+            href: "/pengadaan/persetujuan",
+            icon: BadgeCheck,
+            description: "Pemilik menyetujui permintaan sebelum barang dipesan.",
+          },
+          {
+            label: "Penerimaan",
+            href: "/pengadaan/penerimaan",
+            icon: PackageCheck,
+            description: "Catat barang yang datang. Stok jual tidak bertambah.",
+          },
+        ],
       },
     ],
   },

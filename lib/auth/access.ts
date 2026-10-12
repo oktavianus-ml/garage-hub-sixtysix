@@ -57,6 +57,7 @@ const byRole: Record<Role, Record<string, Access>> = {
 
 function accessKey(href: string) {
   if (href === "/pembelian" || href.startsWith("/pembelian/")) return "/pembelian";
+  if (href === "/pengadaan" || href.startsWith("/pengadaan/")) return "/pengadaan";
   if (href === "/pelanggan" || href.startsWith("/pelanggan/")) return "/pelanggan";
   return href;
 }
@@ -84,6 +85,10 @@ export function allowedHrefs(role: Role) {
     "/pembelian/persetujuan",
     "/pembelian/penerimaan",
     "/pengadaan",
+    "/pengadaan/barang",
+    "/pengadaan/permintaan",
+    "/pengadaan/persetujuan",
+    "/pengadaan/penerimaan",
     "/kas",
     "/laporan",
     "/bagi-hasil",

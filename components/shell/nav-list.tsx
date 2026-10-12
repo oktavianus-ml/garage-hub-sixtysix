@@ -119,9 +119,11 @@ export function NavList({
 function parentQueue(children: NavItem[], counts: Record<string, number>) {
   const hrefs = new Set(children.map((child) => child.href));
   let total = 0;
-  if (hrefs.has("/pembelian/permintaan")) total += counts["/pembelian/permintaan"] ?? 0;
-  else if (hrefs.has("/pembelian/persetujuan")) total += counts["/pembelian/persetujuan"] ?? 0;
-  if (hrefs.has("/pembelian/penerimaan")) total += counts["/pembelian/penerimaan"] ?? 0;
+  for (const prefix of ["/pembelian", "/pengadaan"]) {
+    if (hrefs.has(`${prefix}/permintaan`)) total += counts[`${prefix}/permintaan`] ?? 0;
+    else if (hrefs.has(`${prefix}/persetujuan`)) total += counts[`${prefix}/persetujuan`] ?? 0;
+    if (hrefs.has(`${prefix}/penerimaan`)) total += counts[`${prefix}/penerimaan`] ?? 0;
+  }
   return total;
 }
 
