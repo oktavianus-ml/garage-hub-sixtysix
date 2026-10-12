@@ -1,20 +1,23 @@
 "use client";
 
-import { Search } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/shell/logout-button";
+import { SearchBox } from "@/components/shell/search-box";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { roleLabel, type Role } from "@/lib/auth/roles";
 import { findNavItem } from "@/lib/nav";
 
 export function Topbar({
   user,
+  allowedHrefs,
 }: {
   user: { name: string; role: Role };
+  allowedHrefs: string[];
 }) {
   const pathname = usePathname();
   const current = findNavItem(pathname);
   const initial = user.name.trim().charAt(0).toUpperCase() || "G";
+  const canSearch = allowedHrefs.includes("/pelanggan") || allowedHrefs.includes("/service");
 
   return (
     <header className="sticky top-0 z-20">
@@ -26,13 +29,7 @@ export function Topbar({
           <p className="hidden min-w-0 truncate text-sm font-semibold md:block xl:hidden">
             {current?.label ?? "GarageHub"}
           </p>
-          <div
-            className="hidden h-11 min-w-0 max-w-md flex-1 items-center gap-2 rounded-xl border border-line-strong bg-field px-3 text-sm text-muted xl:flex"
-            aria-hidden="true"
-          >
-            <Search className="size-4 shrink-0" />
-            <span>Cari menyusul</span>
-          </div>
+          <SearchBox enabled={canSearch} />
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
             <div className="hidden items-center gap-2 rounded-full border border-line bg-chip py-1 pr-3 pl-1 sm:flex">

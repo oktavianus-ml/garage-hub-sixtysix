@@ -87,7 +87,7 @@ export function AdminShell({
       </aside>
 
       <div className="md:pl-[72px] xl:pl-[248px]">
-        <Topbar user={user} />
+        <Topbar user={user} allowedHrefs={allowedHrefs} />
         <main className="px-4 pt-4 pb-24 md:px-6 md:pt-6 md:pb-8">{children}</main>
       </div>
 
