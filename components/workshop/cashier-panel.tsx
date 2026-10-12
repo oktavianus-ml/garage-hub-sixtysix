@@ -42,6 +42,7 @@ export function CashierPanel({
                 <option value="">Pilih barang</option>
                 {products.map((product) => (
                   <option key={product.id} value={product.id}>
+                    {product.code ? `${product.code} · ` : ""}
                     {product.name} · {rupiah(product.price)} · stok {product.stock}
                   </option>
                 ))}

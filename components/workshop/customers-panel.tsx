@@ -1,14 +1,44 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { Bike, List, UserPlus } from "lucide-react";
+import { useActionState, useMemo, useState } from "react";
+import { Bike, List, Search, UserPlus } from "lucide-react";
 import { saveCustomerAction, saveVehicleAction } from "@/lib/data/actions";
 import { OTHER_BIKE, bikeBrands, bikeTypes, yearsForBike } from "@/lib/data/bikes";
 import type { Customer, Vehicle } from "@/lib/data/records";
+import { cn } from "@/lib/cn";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
 import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
+
+const PAGE_SIZE = 8;
+
+const bikeFilters = [
+  { id: "semua", label: "Semua" },
+  { id: "ada", label: "Punya motor" },
+  { id: "kosong", label: "Belum ada motor" },
+] as const;
+
+type BikeFilter = (typeof bikeFilters)[number]["id"];
+
+function compact(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function matchesQuery(customer: Customer, bikes: Vehicle[], query: string) {
+  const text = query.trim().toLowerCase();
+  if (!text) return true;
+  const folded = compact(text);
+  const fields = [
+    customer.name,
+    customer.phone,
+    ...bikes.flatMap((bike) => [bike.plate, bike.brand, bike.bikeType, String(bike.year)]),
+  ];
+  return fields.some((field) => {
+    const value = field.toLowerCase();
+    return value.includes(text) || (folded.length >= 2 && compact(field).includes(folded));
+  });
+}
 
 export function CustomersPanel({
   customers,
@@ -148,37 +178,152 @@ export function CustomersPanel({
           </form>
         </GlassCard>
       ) : null}
-      <GlassCard className="p-4 lg:col-span-2">
+      <CustomerDirectory customers={customers} vehicles={vehicles} />
+    </div>
+  );
+}
+
+function CustomerDirectory({
+  customers,
+  vehicles,
+}: {
+  customers: Customer[];
+  vehicles: Vehicle[];
+}) {
+  const [query, setQuery] = useState("");
+  const [bikeFilter, setBikeFilter] = useState<BikeFilter>("semua");
+  const [page, setPage] = useState(0);
+  const bikesByCustomer = useMemo(() => {
+    const grouped = new Map<string, Vehicle[]>();
+    for (const vehicle of vehicles) {
+      const list = grouped.get(vehicle.customerId) ?? [];
+      list.push(vehicle);
+      grouped.set(vehicle.customerId, list);
+    }
+    return grouped;
+  }, [vehicles]);
+  const filtered = useMemo(
+    () =>
+      customers.filter((customer) => {
+        const bikes = bikesByCustomer.get(customer.id) ?? [];
+        if (bikeFilter === "ada" && bikes.length === 0) return false;
+        if (bikeFilter === "kosong" && bikes.length > 0) return false;
+        return matchesQuery(customer, bikes, query);
+      }),
+    [bikeFilter, bikesByCustomer, customers, query],
+  );
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const start = currentPage * PAGE_SIZE;
+  const visible = filtered.slice(start, start + PAGE_SIZE);
+  const rangeStart = filtered.length === 0 ? 0 : start + 1;
+  const rangeEnd = start + visible.length;
+
+  return (
+    <GlassCard className="p-4 lg:col-span-2">
+      <div className="flex items-center justify-between gap-3">
         <SectionTitle icon={List} tone="teal">
           Daftar
         </SectionTitle>
-        {customers.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">Belum ada pelanggan.</p>
-        ) : (
-          <ul className="mt-2 divide-y divide-line">
-            {customers.map((customer) => {
-              const bikes = vehicles.filter((vehicle) => vehicle.customerId === customer.id);
+        {customers.length > 0 ? (
+          <p className="text-xs font-medium text-muted">
+            {filtered.length === customers.length
+              ? `${customers.length} pelanggan`
+              : `${filtered.length} dari ${customers.length}`}
+          </p>
+        ) : null}
+      </div>
+      {customers.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">Belum ada pelanggan.</p>
+      ) : (
+        <>
+          <label className="relative mt-3 block">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" aria-hidden />
+            <input
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(0);
+              }}
+              placeholder="Cari nama, telepon, plat, atau motor"
+              className={cn(inputClass, "pl-10")}
+            />
+          </label>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {bikeFilters.map((filter) => {
+              const active = bikeFilter === filter.id;
               return (
-                <li key={customer.id} className="py-3">
-                  <p className="font-medium">{customer.name}</p>
-                  <p className="text-xs text-muted">{customer.phone || "Tanpa telepon"}</p>
-                  {bikes.length === 0 ? (
-                    <p className="mt-1 text-sm text-muted">Belum ada motor.</p>
-                  ) : (
-                    <ul className="mt-2 flex flex-col gap-1">
-                      {bikes.map((bike) => (
-                        <li key={bike.id} className="text-sm">
-                          {bike.plate} · {bike.brand} {bike.bikeType} · {bike.year}
-                        </li>
-                      ))}
-                    </ul>
+                <button
+                  key={filter.id}
+                  type="button"
+                  aria-pressed={active}
+                  className={cn(
+                    "h-8 rounded-full border px-3 text-xs font-semibold",
+                    active ? "border-teal/40 bg-teal-soft text-teal" : "border-line bg-chip text-muted",
                   )}
-                </li>
+                  onClick={() => {
+                    setBikeFilter(filter.id);
+                    setPage(0);
+                  }}
+                >
+                  {filter.label}
+                </button>
               );
             })}
-          </ul>
-        )}
-      </GlassCard>
-    </div>
+          </div>
+          {visible.length === 0 ? (
+            <p className="mt-3 text-sm text-muted">Tidak ada pelanggan yang cocok.</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-line">
+              {visible.map((customer) => {
+                const bikes = bikesByCustomer.get(customer.id) ?? [];
+                return (
+                  <li key={customer.id} className="py-3">
+                    <p className="font-medium">{customer.name}</p>
+                    <p className="text-xs text-muted">{customer.phone || "Tanpa telepon"}</p>
+                    {bikes.length === 0 ? (
+                      <p className="mt-1 text-sm text-muted">Belum ada motor.</p>
+                    ) : (
+                      <ul className="mt-2 flex flex-col gap-1">
+                        {bikes.map((bike) => (
+                          <li key={bike.id} className="text-sm">
+                            {bike.plate} · {bike.brand} {bike.bikeType} · {bike.year}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {filtered.length > PAGE_SIZE ? (
+            <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
+              <p className="text-xs text-muted">
+                {rangeStart}–{rangeEnd} dari {filtered.length}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="h-9 rounded-xl border border-line bg-chip px-3 text-sm font-medium disabled:opacity-40"
+                  disabled={currentPage === 0}
+                  onClick={() => setPage(currentPage - 1)}
+                >
+                  Sebelumnya
+                </button>
+                <button
+                  type="button"
+                  className="h-9 rounded-xl border border-line bg-chip px-3 text-sm font-medium disabled:opacity-40"
+                  disabled={currentPage >= pageCount - 1}
+                  onClick={() => setPage(currentPage + 1)}
+                >
+                  Berikutnya
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
+      )}
+    </GlassCard>
   );
 }

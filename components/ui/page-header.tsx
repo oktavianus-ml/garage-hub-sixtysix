@@ -23,16 +23,16 @@ export function PageHeader({
         </span>
       ) : null}
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
           {example ? (
             <span className="rounded-full bg-amber-soft px-2.5 py-1 text-xs font-semibold text-amber">
               Contoh
             </span>
           ) : null}
+          <p className="text-sm text-muted">{description}</p>
         </div>
         <span className="mt-2 block h-0.5 w-10 rounded-full bg-amber" aria-hidden />
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">{description}</p>
       </div>
     </header>
   );

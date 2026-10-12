@@ -83,17 +83,19 @@ export async function saveVehicleAction(_prev: FormState, formData: FormData): P
 export async function saveProductAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/produk");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const code = String(formData.get("code") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   const cost = asInt(formData.get("cost"));
   const price = asInt(formData.get("price"));
   const stock = asInt(formData.get("stock"));
   const safetyStock = asInt(formData.get("safetyStock"));
-  if (!name || cost === null || price === null || stock === null || safetyStock === null) {
-    return { message: "Lengkapi nama, harga pokok, harga jual, stok, dan batas aman." };
+  if (!code || !name || cost === null || price === null || stock === null || safetyStock === null) {
+    return { message: "Lengkapi kode produk, nama, harga pokok, harga jual, stok, dan batas aman." };
   }
   try {
     await saveProduct({
       id: String(formData.get("id") ?? "") || undefined,
+      code,
       name,
       unit: String(formData.get("unit") ?? "pcs").trim() || "pcs",
       cost,

@@ -16,6 +16,7 @@ export type Vehicle = {
 };
 export type Product = {
   id: string;
+  code: string;
   name: string;
   unit: string;
   cost: number;
@@ -242,6 +243,7 @@ export async function listProducts() {
   return snap.docs
     .map((doc) => ({
       id: doc.id,
+      code: text(doc.data().code),
       name: text(doc.data().name),
       unit: text(doc.data().unit, "pcs"),
       cost: num(doc.data().cost),
@@ -254,6 +256,7 @@ export async function listProducts() {
 
 export async function saveProduct(input: {
   id?: string;
+  code: string;
   name: string;
   unit: string;
   cost: number;
@@ -261,11 +264,18 @@ export async function saveProduct(input: {
   stock: number;
   safetyStock: number;
 }) {
+  const code = input.code.trim().toUpperCase();
+  if (!code) throw new Error("Isi kode produk.");
   const ref = input.id
     ? store().collection("products").doc(input.id)
     : store().collection("products").doc();
+  const taken = await store().collection("products").where("code", "==", code).limit(1).get();
+  if (!taken.empty && taken.docs[0]?.id !== ref.id) {
+    throw new Error("Kode produk sudah dipakai.");
+  }
   await ref.set(
     {
+      code,
       name: input.name,
       unit: input.unit || "pcs",
       cost: input.cost,

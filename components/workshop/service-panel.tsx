@@ -129,6 +129,7 @@ export function ServicePanel({
                   <option value="">Tambah part</option>
                   {products.map((product) => (
                     <option key={product.id} value={product.id}>
+                      {product.code ? `${product.code} · ` : ""}
                       {product.name} · stok {product.stock}
                     </option>
                   ))}
