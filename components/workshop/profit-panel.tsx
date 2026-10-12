@@ -3,7 +3,8 @@
 import { useActionState } from "react";
 import { closeMonthAction, saveSplitAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
-import { buttonClass, inputClass } from "@/components/ui/controls";
+import { inputClass } from "@/components/ui/controls";
+import { SaveButton } from "@/components/ui/save-button";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function ProfitPanel({
@@ -81,16 +82,14 @@ export function ProfitPanel({
                   aria-label="Persen investor"
                 />
                 {splitState?.message ? <p className="text-sm text-danger">{splitState.message}</p> : null}
-                <button className={buttonClass} disabled={splitPending}>
-                  Simpan persentase
-                </button>
+                <SaveButton pending={splitPending}>Simpan persentase</SaveButton>
               </form>
               <form action={closeAction} className="mt-4">
                 <input type="hidden" name="month" value={month} />
                 {closeState?.message ? <p className="mb-2 text-sm text-danger">{closeState.message}</p> : null}
-                <button className={`${buttonClass} w-full`} disabled={closePending}>
+                <SaveButton pending={closePending} className="w-full">
                   Tutup buku bulan ini
-                </button>
+                </SaveButton>
               </form>
             </>
           )}

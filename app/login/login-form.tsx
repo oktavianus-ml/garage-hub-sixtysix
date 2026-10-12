@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { BrandMark } from "@/components/shell/brand-mark";
 import { GlassCard } from "@/components/ui/glass-card";
+import { SaveButton } from "@/components/ui/save-button";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 
 function messageFor(code: string) {
@@ -126,13 +127,9 @@ export function LoginForm({
           </label>
           {error ? <p className="text-sm text-danger">{error}</p> : null}
           {notice ? <p className="text-sm text-teal">{notice}</p> : null}
-          <button
-            type="submit"
-            disabled={blocked || pending}
-            className="h-11 rounded-xl bg-amber font-semibold text-[#1c1915] disabled:opacity-60"
-          >
-            {pending ? "Memeriksa..." : "Masuk"}
-          </button>
+          <SaveButton pending={pending} disabled={blocked} pendingLabel="Memeriksa...">
+            Masuk
+          </SaveButton>
         </form>
         {!configMessage ? (
           <button

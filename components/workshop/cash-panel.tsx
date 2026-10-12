@@ -4,7 +4,8 @@ import { useActionState } from "react";
 import { saveCashAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
 import type { CashDay } from "@/lib/data/records";
-import { buttonClass, inputClass } from "@/components/ui/controls";
+import { inputClass } from "@/components/ui/controls";
+import { SaveButton } from "@/components/ui/save-button";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function CashPanel({
@@ -75,9 +76,7 @@ export function CashPanel({
               />
               <input name="note" placeholder="Catatan" defaultValue={saved?.note ?? ""} className={inputClass} />
               {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
-              <button className={buttonClass} disabled={pending}>
-                Simpan tutup kas
-              </button>
+              <SaveButton pending={pending}>Simpan tutup kas</SaveButton>
             </form>
           )}
         </GlassCard>

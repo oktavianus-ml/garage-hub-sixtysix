@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { guard } from "@/lib/auth/guard";
 import { isRole } from "@/lib/auth/roles";
+import { bikeSelectionError } from "@/lib/data/bikes";
 import { asInt, jakartaDate } from "@/lib/data/format";
 import {
   closeMonth,
@@ -61,6 +62,8 @@ export async function saveVehicleAction(_prev: FormState, formData: FormData): P
   if (!customerId || !plate || !brand || !bikeType || year === null) {
     return { message: "Lengkapi plat, merk, tipe, dan tahun." };
   }
+  const bikeError = bikeSelectionError(brand, bikeType, year);
+  if (bikeError) return { message: bikeError };
   try {
     await saveVehicle({
       id: String(formData.get("id") ?? "") || undefined,

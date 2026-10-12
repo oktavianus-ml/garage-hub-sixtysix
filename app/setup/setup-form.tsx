@@ -7,6 +7,7 @@ import { useState } from "react";
 import { registerOwner } from "@/app/setup/actions";
 import { BrandMark } from "@/components/shell/brand-mark";
 import { GlassCard } from "@/components/ui/glass-card";
+import { SaveButton } from "@/components/ui/save-button";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 
 export function SetupForm({ configMessage }: { configMessage: string | null }) {
@@ -109,13 +110,9 @@ export function SetupForm({ configMessage }: { configMessage: string | null }) {
             />
           </label>
           {error ? <p className="text-sm text-danger">{error}</p> : null}
-          <button
-            type="submit"
-            disabled={blocked || pending}
-            className="h-11 rounded-xl bg-amber font-semibold text-[#1c1915] disabled:opacity-60"
-          >
-            {pending ? "Menyimpan..." : "Buat akun pemilik"}
-          </button>
+          <SaveButton pending={pending} disabled={blocked}>
+            Buat akun pemilik
+          </SaveButton>
         </form>
         <p className="mt-4 text-sm text-muted">
           Sudah punya akun?{" "}

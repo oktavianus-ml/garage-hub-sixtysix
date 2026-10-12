@@ -4,7 +4,8 @@ import { useActionState } from "react";
 import { saveStaffAction } from "@/lib/data/actions";
 import { ROLES, roleLabel, type Role } from "@/lib/auth/roles";
 import type { StaffUser } from "@/lib/data/records";
-import { buttonClass, inputClass } from "@/components/ui/controls";
+import { inputClass } from "@/components/ui/controls";
+import { SaveButton } from "@/components/ui/save-button";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function StaffPanel({ staff }: { staff: StaffUser[] }) {
@@ -27,9 +28,7 @@ export function StaffPanel({ staff }: { staff: StaffUser[] }) {
             ))}
           </select>
           {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
-          <button className={buttonClass} disabled={pending}>
-            Buat akun
-          </button>
+          <SaveButton pending={pending}>Buat akun</SaveButton>
         </form>
       </GlassCard>
       <GlassCard className="p-4">

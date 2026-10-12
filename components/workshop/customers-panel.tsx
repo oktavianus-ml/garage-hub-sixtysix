@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveCustomerAction, saveVehicleAction } from "@/lib/data/actions";
+import { OTHER_BIKE, bikeBrands, bikeTypes, yearsForBike } from "@/lib/data/bikes";
 import type { Customer, Vehicle } from "@/lib/data/records";
-import { buttonClass, inputClass } from "@/components/ui/controls";
+import { inputClass } from "@/components/ui/controls";
+import { SaveButton } from "@/components/ui/save-button";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function CustomersPanel({
@@ -17,6 +19,19 @@ export function CustomersPanel({
 }) {
   const [customerState, customerAction, customerPending] = useActionState(saveCustomerAction, null);
   const [vehicleState, vehicleAction, vehiclePending] = useActionState(saveVehicleAction, null);
+  const [brandChoice, setBrandChoice] = useState("");
+  const [typeChoice, setTypeChoice] = useState("");
+  const [yearChoice, setYearChoice] = useState("");
+  const brandIsOther = brandChoice === OTHER_BIKE;
+  const typeIsOther = typeChoice === OTHER_BIKE;
+  const types = brandChoice && !brandIsOther ? bikeTypes(brandChoice) : [];
+  const yearReady = brandIsOther || typeIsOther || Boolean(typeChoice);
+  const years =
+    brandIsOther || typeIsOther
+      ? yearsForBike("", "")
+      : typeChoice
+        ? yearsForBike(brandChoice, typeChoice)
+        : [];
 
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-2">
@@ -27,9 +42,7 @@ export function CustomersPanel({
             <input name="name" required placeholder="Nama" className={inputClass} />
             <input name="phone" placeholder="Telepon" className={inputClass} />
             {customerState?.message ? <p className="text-sm text-danger">{customerState.message}</p> : null}
-            <button className={buttonClass} disabled={customerPending}>
-              Simpan pelanggan
-            </button>
+            <SaveButton pending={customerPending}>Simpan pelanggan</SaveButton>
           </form>
         </GlassCard>
       ) : null}
@@ -48,13 +61,76 @@ export function CustomersPanel({
               ))}
             </select>
             <input name="plate" required placeholder="Plat" className={inputClass} />
-            <input name="brand" required placeholder="Merk" className={inputClass} />
-            <input name="bikeType" required placeholder="Tipe" className={inputClass} />
-            <input name="year" required inputMode="numeric" placeholder="Tahun" className={inputClass} />
+            <select
+              required
+              className={inputClass}
+              name={brandIsOther ? undefined : "brand"}
+              value={brandChoice}
+              onChange={(event) => {
+                setBrandChoice(event.target.value);
+                setTypeChoice("");
+                setYearChoice("");
+              }}
+            >
+              <option value="" disabled>
+                Pilih merk
+              </option>
+              {bikeBrands().map((brand) => (
+                <option key={brand} value={brand}>
+                  {brand}
+                </option>
+              ))}
+              <option value={OTHER_BIKE}>{OTHER_BIKE}</option>
+            </select>
+            {brandIsOther ? (
+              <input name="brand" required placeholder="Merk" className={inputClass} />
+            ) : (
+              <select
+                required
+                className={inputClass}
+                name={typeIsOther ? undefined : "bikeType"}
+                value={typeChoice}
+                disabled={!brandChoice}
+                onChange={(event) => {
+                  setTypeChoice(event.target.value);
+                  setYearChoice("");
+                }}
+              >
+                <option value="" disabled>
+                  Pilih tipe
+                </option>
+                {types.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+                <option value={OTHER_BIKE}>{OTHER_BIKE}</option>
+              </select>
+            )}
+            {brandIsOther || typeIsOther ? (
+              <input name="bikeType" required placeholder="Tipe" className={inputClass} />
+            ) : null}
+            <select
+              name="year"
+              required
+              className={inputClass}
+              value={yearChoice}
+              disabled={!yearReady}
+              onChange={(event) => setYearChoice(event.target.value)}
+            >
+              <option value="" disabled>
+                Pilih tahun
+              </option>
+              {years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
             {vehicleState?.message ? <p className="text-sm text-danger">{vehicleState.message}</p> : null}
-            <button className={buttonClass} disabled={vehiclePending || customers.length === 0}>
+            <SaveButton pending={vehiclePending} disabled={customers.length === 0}>
               Simpan motor
-            </button>
+            </SaveButton>
           </form>
         </GlassCard>
       ) : null}

@@ -4,7 +4,8 @@ import { useMemo, useState, useActionState } from "react";
 import { saveSaleAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
 import type { Product, WalkInSale } from "@/lib/data/records";
-import { buttonClass, inputClass } from "@/components/ui/controls";
+import { inputClass } from "@/components/ui/controls";
+import { SaveButton } from "@/components/ui/save-button";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function CashierPanel({
@@ -89,9 +90,9 @@ export function CashierPanel({
             </ul>
             <p className="text-lg font-semibold tabular-nums">{rupiah(total)}</p>
             {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
-            <button className={buttonClass} disabled={pending || lines.length === 0}>
+            <SaveButton pending={pending} disabled={lines.length === 0}>
               Simpan penjualan
-            </button>
+            </SaveButton>
           </form>
         </GlassCard>
       ) : null}

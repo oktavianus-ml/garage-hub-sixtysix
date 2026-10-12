@@ -4,7 +4,8 @@ import { useActionState } from "react";
 import { saveProductAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
 import type { Product } from "@/lib/data/records";
-import { buttonClass, inputClass } from "@/components/ui/controls";
+import { inputClass } from "@/components/ui/controls";
+import { SaveButton } from "@/components/ui/save-button";
 import { GlassCard } from "@/components/ui/glass-card";
 
 export function ProductsPanel({
@@ -35,9 +36,9 @@ export function ProductsPanel({
               className={`${inputClass} sm:col-span-2`}
             />
             {state?.message ? <p className="text-sm text-danger sm:col-span-2">{state.message}</p> : null}
-            <button className={`${buttonClass} sm:col-span-2`} disabled={pending}>
+            <SaveButton pending={pending} className="sm:col-span-2">
               Simpan produk
-            </button>
+            </SaveButton>
           </form>
         </GlassCard>
       ) : null}

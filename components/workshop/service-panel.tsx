@@ -4,7 +4,8 @@ import { useMemo, useState, useActionState } from "react";
 import { saveServiceAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
 import type { Customer, Product, ServiceOrder, SpkStatus, StaffUser, Vehicle } from "@/lib/data/records";
-import { buttonClass, inputClass } from "@/components/ui/controls";
+import { inputClass } from "@/components/ui/controls";
+import { SaveButton } from "@/components/ui/save-button";
 import { GlassCard } from "@/components/ui/glass-card";
 
 const labels: Record<SpkStatus, string> = {
@@ -176,9 +177,9 @@ export function ServicePanel({
               </ul>
               <p className="text-sm text-muted">Perkiraan part {rupiah(total)} ditambah ongkos jasa.</p>
               {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
-              <button className={buttonClass} disabled={pending || mechanics.length === 0}>
+              <SaveButton pending={pending} disabled={mechanics.length === 0}>
                 Simpan SPK
-              </button>
+              </SaveButton>
               {mechanics.length === 0 ? (
                 <p className="text-sm text-muted">Tambah pegawai mekanik dulu.</p>
               ) : null}
