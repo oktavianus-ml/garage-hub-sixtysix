@@ -261,8 +261,6 @@ export async function saveProduct(input: {
   unit: string;
   cost: number;
   price: number;
-  stock: number;
-  safetyStock: number;
 }) {
   const code = input.code.trim().toUpperCase();
   if (!code) throw new Error("Isi kode produk.");
@@ -280,8 +278,7 @@ export async function saveProduct(input: {
       unit: input.unit || "pcs",
       cost: input.cost,
       price: input.price,
-      stock: input.stock,
-      safetyStock: input.safetyStock,
+      ...(input.id ? {} : { stock: 0, safetyStock: 0 }),
     },
     { merge: true },
   );
@@ -661,7 +658,7 @@ export async function todayBoard() {
   const gross =
     orders.reduce((sum, order) => sum + (order.grand - order.partsCost), 0) +
     sales.reduce((sum, sale) => sum + (sale.total - sale.lines.reduce((lineSum, line) => lineSum + line.qty * line.cost, 0)), 0);
-  const lowStock = products.filter((product) => product.stock <= product.safetyStock);
+  const lowStock = products.filter((product) => product.safetyStock > 0 && product.stock <= product.safetyStock);
   const movements = [
     ...orders.map((order) => ({
       title: order.no,

@@ -27,10 +27,9 @@ export function ProductsPanel({
         <GlassCard accent className="p-4">
           <SectionTitle icon={PackagePlus}>Produk</SectionTitle>
           <form action={action} className="mt-3 grid gap-3 sm:grid-cols-2">
-            <input name="code" required placeholder="Kode produk" className={`${inputClass} sm:col-span-2`} />
             <input name="name" required placeholder="Nama barang" className={`${inputClass} sm:col-span-2`} />
-            <input name="stock" required inputMode="numeric" placeholder="Stok" className={inputClass} />
-            <select name="unit" aria-label="Satuan" className={inputClass} defaultValue="pcs">
+            <input name="code" required placeholder="Kode produk" className={`${inputClass} sm:col-span-2`} />
+            <select name="unit" aria-label="Satuan" className={`${inputClass} sm:col-span-2`} defaultValue="pcs">
               {UNITS.map((unit) => (
                 <option key={unit} value={unit}>
                   {unit}
@@ -39,13 +38,6 @@ export function ProductsPanel({
             </select>
             <input name="cost" required inputMode="numeric" placeholder="Harga pokok" className={inputClass} />
             <input name="price" required inputMode="numeric" placeholder="Harga jual" className={inputClass} />
-            <input
-              name="safetyStock"
-              required
-              inputMode="numeric"
-              placeholder="Batas aman"
-              className={`${inputClass} sm:col-span-2`}
-            />
             {state?.message ? <p className="text-sm text-danger sm:col-span-2">{state.message}</p> : null}
             <SaveButton pending={pending} className="sm:col-span-2">
               Simpan produk
@@ -62,16 +54,11 @@ export function ProductsPanel({
         ) : (
           <ul className="mt-2 divide-y divide-line">
             {products.map((product) => (
-              <li key={product.id} className="flex items-start justify-between gap-3 py-3">
-                <div>
-                  {product.code ? <p className="text-xs font-semibold tracking-wide text-muted">{product.code}</p> : null}
-                  <p className="font-medium">{product.name}</p>
-                  <p className="text-xs text-muted">
-                    Pokok {rupiah(product.cost)} · jual {rupiah(product.price)}
-                  </p>
-                </div>
-                <p className="text-sm font-semibold tabular-nums">
-                  stok {product.stock} {product.unit}
+              <li key={product.id} className="py-3">
+                {product.code ? <p className="text-xs font-semibold tracking-wide text-muted">{product.code}</p> : null}
+                <p className="font-medium">{product.name}</p>
+                <p className="text-xs text-muted">
+                  Pokok {rupiah(product.cost)} · jual {rupiah(product.price)} · {product.unit}
                 </p>
               </li>
             ))}

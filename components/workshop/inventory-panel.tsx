@@ -5,7 +5,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { SectionTitle } from "@/components/ui/section-title";
 
 export function InventoryPanel({ products }: { products: Product[] }) {
-  const low = products.filter((product) => product.stock <= product.safetyStock);
+  const low = products.filter((product) => product.safetyStock > 0 && product.stock <= product.safetyStock);
 
   return (
     <div className="mt-5 grid gap-4">
@@ -23,7 +23,7 @@ export function InventoryPanel({ products }: { products: Product[] }) {
         ) : (
           <ul className="mt-2 divide-y divide-line">
             {products.map((product) => {
-              const warn = product.stock <= product.safetyStock;
+              const warn = product.safetyStock > 0 && product.stock <= product.safetyStock;
               return (
                 <li key={product.id} className="flex items-center justify-between gap-3 py-3">
                   <div>

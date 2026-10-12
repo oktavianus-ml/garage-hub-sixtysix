@@ -10,7 +10,7 @@ export default async function ProdukPage() {
   const products = await listProducts();
   return (
     <div>
-      <PageHeader title="Produk" description="Harga pokok, harga jual, dan stok barang." href="/produk" />
+      <PageHeader title="Produk" description="Master barang, harga pokok, dan harga jual." href="/produk" />
       <ProductsPanel products={products} canWrite={canWrite} />
     </div>
   );
