@@ -9,10 +9,12 @@ export function MenuSheet({
   open,
   onClose,
   allowedHrefs,
+  counts = {},
 }: {
   open: boolean;
   onClose: () => void;
   allowedHrefs: string[];
+  counts?: Record<string, number>;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -55,7 +57,7 @@ export function MenuSheet({
             <X className="size-5" />
           </button>
         </div>
-        <NavList showLabels onNavigate={onClose} allowedHrefs={allowedHrefs} />
+        <NavList showLabels onNavigate={onClose} allowedHrefs={allowedHrefs} counts={counts} />
       </div>
     </div>
   );

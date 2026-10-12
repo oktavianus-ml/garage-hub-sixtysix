@@ -1,8 +1,5 @@
-import type { Metadata } from "next";
-import { ModulePage } from "@/components/ui/module-page";
-
-export const metadata: Metadata = { title: "Pembelian" };
+import { redirect } from "next/navigation";
 
 export default function PembelianPage() {
-  return <ModulePage href="/pembelian" />;
+  redirect("/pembelian/permintaan");
 }

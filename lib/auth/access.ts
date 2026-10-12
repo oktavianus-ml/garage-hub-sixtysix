@@ -23,6 +23,7 @@ const byRole: Record<Role, Record<string, Access>> = {
     "/produk": "read",
     "/inventori": "read",
     "/distributor": "read",
+    "/pembelian": "read",
     "/kas": "read",
     "/bagi-hasil": "read",
   },
@@ -40,6 +41,7 @@ const byRole: Record<Role, Record<string, Access>> = {
     "/produk": "write",
     "/inventori": "write",
     "/distributor": "write",
+    "/pembelian": "write",
   },
   mekanik: {
     "/": "read",
@@ -51,8 +53,9 @@ const byRole: Record<Role, Record<string, Access>> = {
 };
 
 export function accessFor(role: Role, href: string): Access {
+  const key = href === "/pembelian" || href.startsWith("/pembelian/") ? "/pembelian" : href;
   if (role === "pemilik") return "write";
-  return byRole[role][href] ?? shared[href] ?? "none";
+  return byRole[role][key] ?? shared[key] ?? "none";
 }
 
 export function allowedHrefs(role: Role) {
@@ -65,6 +68,9 @@ export function allowedHrefs(role: Role) {
     "/inventori",
     "/distributor",
     "/pembelian",
+    "/pembelian/permintaan",
+    "/pembelian/persetujuan",
+    "/pembelian/penerimaan",
     "/pengadaan",
     "/kas",
     "/laporan",
@@ -80,4 +86,8 @@ export function allowedHrefs(role: Role) {
 
 export function canMarkPaid(role: Role) {
   return role === "pemilik" || role === "kasir";
+}
+
+export function canPlacePurchase(role: Role) {
+  return role === "pemilik";
 }

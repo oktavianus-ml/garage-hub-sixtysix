@@ -1,11 +1,14 @@
 import {
   BookOpen,
+  BadgeCheck,
   ClipboardList,
+  ClipboardPen,
   FileSpreadsheet,
   HardHat,
   History,
   LayoutDashboard,
   Package,
+  PackageCheck,
   PieChart,
   Scale,
   ScrollText,
@@ -24,6 +27,7 @@ export type NavItem = {
   href: string;
   icon: LucideIcon;
   description: string;
+  children?: NavItem[];
 };
 
 export type NavGroup = {
@@ -92,8 +96,27 @@ export const navGroups: NavGroup[] = [
         label: "Pembelian",
         href: "/pembelian",
         icon: ClipboardList,
-        description:
-          "Permintaan, pesanan, dan penerimaan barang dagang (PR, PO, GRN).",
+        description: "Permintaan, persetujuan, dan penerimaan barang dari distributor.",
+        children: [
+          {
+            label: "Permintaan",
+            href: "/pembelian/permintaan",
+            icon: ClipboardPen,
+            description: "Usulan barang yang akan dibeli dari distributor.",
+          },
+          {
+            label: "Persetujuan",
+            href: "/pembelian/persetujuan",
+            icon: BadgeCheck,
+            description: "Pemilik menyetujui permintaan sebelum barang dipesan.",
+          },
+          {
+            label: "Penerimaan",
+            href: "/pembelian/penerimaan",
+            icon: PackageCheck,
+            description: "Catat barang yang datang supaya stok bertambah.",
+          },
+        ],
       },
       {
         label: "Pengadaan",
@@ -174,8 +197,11 @@ export const navGroups: NavGroup[] = [
 
 export function findNavItem(href: string) {
   for (const group of navGroups) {
-    const item = group.items.find((entry) => entry.href === href);
-    if (item) return item;
+    for (const item of group.items) {
+      if (item.href === href) return item;
+      const child = item.children?.find((entry) => entry.href === href);
+      if (child) return child;
+    }
   }
   return undefined;
 }

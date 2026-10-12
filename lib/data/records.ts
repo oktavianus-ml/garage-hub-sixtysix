@@ -1,7 +1,7 @@
 import type { Transaction } from "firebase-admin/firestore";
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase/admin";
 import { roleLabel, type Role } from "@/lib/auth/roles";
-import { canMarkPaid } from "@/lib/auth/access";
+import { canMarkPaid, canPlacePurchase } from "@/lib/auth/access";
 import {
   fieldChanges,
   queueActivity,
@@ -9,6 +9,7 @@ import {
   type ActivityChange,
 } from "@/lib/data/activity";
 import { jakartaDate, monthKeyOf, rupiah } from "@/lib/data/format";
+import { PURCHASE_STATUSES, purchaseStatusLabel, type PurchaseStatus } from "@/lib/data/purchase";
 import { heldQty, holdDelta, type HeldPart } from "@/lib/data/stock";
 
 export type Customer = { id: string; name: string; phone: string };
@@ -37,6 +38,33 @@ export type Distributor = {
   phone: string;
   address: string;
   note: string;
+};
+export type { PurchaseStatus } from "@/lib/data/purchase";
+export { purchaseStatusLabel } from "@/lib/data/purchase";
+export type PurchaseLine = {
+  productId: string;
+  name: string;
+  unit: string;
+  qty: number;
+  cost: number;
+  received: number;
+};
+export type PurchaseReceipt = {
+  at: string;
+  lines: { productId: string; name: string; qty: number }[];
+};
+export type Purchase = {
+  id: string;
+  no: string;
+  distributorId: string;
+  distributorName: string;
+  status: PurchaseStatus;
+  note: string;
+  lines: PurchaseLine[];
+  receipts: PurchaseReceipt[];
+  total: number;
+  createdAt: string;
+  orderedAt: string | null;
 };
 export type StaffUser = {
   id: string;
@@ -137,7 +165,7 @@ async function ensureOpen(tx: Transaction, month: string) {
   }
 }
 
-async function takeNumber(tx: Transaction, prefix: "SPK" | "KSR") {
+async function takeNumber(tx: Transaction, prefix: "SPK" | "KSR" | "PB") {
   const ref = store().doc("meta/sequences");
   const snap = await tx.get(ref);
   const next = num(snap.data()?.[prefix]) + 1;
@@ -512,6 +540,323 @@ export async function saveDistributor(
   });
   await batch.commit();
   return ref.id;
+}
+
+function mapPurchaseLines(value: unknown): PurchaseLine[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const productId = text(row.productId);
+    if (!productId) return [];
+    return [
+      {
+        productId,
+        name: text(row.name, "Produk"),
+        unit: text(row.unit, "pcs"),
+        qty: num(row.qty),
+        cost: num(row.cost),
+        received: num(row.received),
+      },
+    ];
+  });
+}
+
+function mapReceipts(value: unknown): PurchaseReceipt[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const lines = mapPurchaseLines(row.lines).map((line) => ({
+      productId: line.productId,
+      name: line.name,
+      qty: line.qty,
+    }));
+    return [{ at: text(row.at), lines }];
+  });
+}
+
+function mapPurchase(id: string, data: FirebaseFirestore.DocumentData): Purchase {
+  const lines = mapPurchaseLines(data.lines);
+  const status = PURCHASE_STATUSES.includes(data.status) ? data.status : "diminta";
+  return {
+    id,
+    no: text(data.no),
+    distributorId: text(data.distributorId),
+    distributorName: text(data.distributorName),
+    status,
+    note: text(data.note),
+    lines,
+    receipts: mapReceipts(data.receipts),
+    total: lines.reduce((sum, line) => sum + line.qty * line.cost, 0),
+    createdAt: text(data.createdAt),
+    orderedAt: data.orderedAt ? text(data.orderedAt) : null,
+  };
+}
+
+function purchaseFields(purchase: {
+  distributorName: string;
+  lines: PurchaseLine[];
+  status: PurchaseStatus;
+  total: number;
+  note: string;
+}) {
+  return {
+    Distributor: purchase.distributorName,
+    Barang: purchase.lines.map((line) => `${line.name} ×${line.qty}`).join(", "),
+    Status: purchaseStatusLabel[purchase.status],
+    Total: rupiah(purchase.total),
+    Catatan: purchase.note,
+  };
+}
+
+function mergePurchaseLines(lines: { productId: string; qty: number; cost: number }[]) {
+  if (lines.length === 0) throw new Error("Tambah barang yang dibeli.");
+  const merged = new Map<string, { qty: number; cost: number }>();
+  for (const line of lines) {
+    if (!line.productId || !Number.isInteger(line.qty) || line.qty <= 0 || line.qty > 100000) {
+      throw new Error("Jumlah barang harus lebih dari nol.");
+    }
+    if (!Number.isInteger(line.cost) || line.cost < 0 || line.cost > 1_000_000_000) {
+      throw new Error("Harga beli tidak valid.");
+    }
+    const previous = merged.get(line.productId);
+    if (previous && previous.cost !== line.cost) throw new Error("Harga beli satu barang harus sama.");
+    merged.set(line.productId, { qty: (previous?.qty ?? 0) + line.qty, cost: line.cost });
+  }
+  return merged;
+}
+
+export async function listPurchases() {
+  const snap = await store().collection("purchases").get();
+  return snap.docs
+    .map((doc) => mapPurchase(doc.id, doc.data()))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function purchaseQueueCounts() {
+  const purchases = await listPurchases();
+  const menunggu = purchases.filter((item) => item.status === "diminta").length;
+  const datang = purchases.filter((item) => item.status === "dipesan" || item.status === "sebagian").length;
+  return {
+    "/pembelian/permintaan": menunggu,
+    "/pembelian/persetujuan": menunggu,
+    "/pembelian/penerimaan": datang,
+  };
+}
+
+export async function savePurchase(
+  input: {
+    id?: string;
+    distributorId: string;
+    note: string;
+    lines: { productId: string; qty: number; cost: number }[];
+  },
+  actor: ActivityActor,
+) {
+  const merged = mergePurchaseLines(input.lines);
+  const database = store();
+
+  await database.runTransaction(async (tx) => {
+    const ref = input.id
+      ? database.collection("purchases").doc(input.id)
+      : database.collection("purchases").doc();
+    const existingSnap = input.id ? await tx.get(ref) : null;
+    const existing = existingSnap?.exists ? mapPurchase(existingSnap.id, existingSnap.data() ?? {}) : null;
+    if (input.id && !existing) throw new Error("Pembelian tidak ditemukan.");
+    if (existing && existing.status !== "diminta") {
+      throw new Error("Pesanan yang sudah dikirim tidak bisa diubah.");
+    }
+    const distributorSnap = await tx.get(database.collection("distributors").doc(input.distributorId));
+    if (!distributorSnap.exists) throw new Error("Distributor tidak ditemukan.");
+    const productSnaps = [];
+    for (const productId of merged.keys()) {
+      productSnaps.push(await tx.get(database.collection("products").doc(productId)));
+    }
+    const lines: PurchaseLine[] = productSnaps.map((snap) => {
+      if (!snap.exists) throw new Error("Produk tidak ditemukan.");
+      const row = merged.get(snap.id);
+      return {
+        productId: snap.id,
+        name: text(snap.data()?.name, "Produk"),
+        unit: text(snap.data()?.unit, "pcs"),
+        qty: row?.qty ?? 0,
+        cost: row?.cost ?? 0,
+        received: 0,
+      };
+    });
+    const no = existing?.no ?? (await takeNumber(tx, "PB"));
+    const distributorName = text(distributorSnap.data()?.name, "Distributor");
+    const total = lines.reduce((sum, line) => sum + line.qty * line.cost, 0);
+    const next = {
+      distributorName,
+      lines,
+      status: "diminta" as const,
+      total,
+      note: input.note,
+    };
+    tx.set(ref, {
+      no,
+      distributorId: input.distributorId,
+      distributorName,
+      status: "diminta",
+      note: input.note,
+      lines,
+      receipts: existing?.receipts ?? [],
+      total,
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      orderedAt: null,
+    });
+    queueActivity(tx, {
+      actor,
+      action: existing ? "ubah" : "buat",
+      entity: "pembelian",
+      entityId: ref.id,
+      label: existing ? `${no} diubah` : `${no} diminta ke ${distributorName}`,
+      changes: fieldChanges(existing ? purchaseFields(existing) : {}, purchaseFields(next)),
+    });
+  });
+}
+
+export async function placePurchase(id: string, actor: ActivityActor) {
+  if (!canPlacePurchase(actor.role)) {
+    throw new Error("Hanya pemilik yang menyetujui permintaan.");
+  }
+  const database = store();
+  await database.runTransaction(async (tx) => {
+    const ref = database.collection("purchases").doc(id);
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error("Pembelian tidak ditemukan.");
+    const purchase = mapPurchase(snap.id, snap.data() ?? {});
+    if (purchase.status !== "diminta") throw new Error("Hanya permintaan yang bisa disetujui.");
+    if (!purchase.distributorId) throw new Error("Pilih distributor dulu.");
+    tx.update(ref, { status: "dipesan", orderedAt: new Date().toISOString() });
+    queueActivity(tx, {
+      actor,
+      action: "ubah",
+      entity: "pembelian",
+      entityId: id,
+      label: `${purchase.no} disetujui ke ${purchase.distributorName}`,
+      changes: fieldChanges(
+        { Status: purchaseStatusLabel.diminta },
+        { Status: purchaseStatusLabel.dipesan },
+      ),
+    });
+  });
+}
+
+export async function cancelPurchase(id: string, actor: ActivityActor) {
+  const database = store();
+  await database.runTransaction(async (tx) => {
+    const ref = database.collection("purchases").doc(id);
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error("Pembelian tidak ditemukan.");
+    const purchase = mapPurchase(snap.id, snap.data() ?? {});
+    if (purchase.status !== "diminta" && purchase.status !== "dipesan") {
+      throw new Error("Pesanan ini tidak bisa dibatalkan.");
+    }
+    if (purchase.lines.some((line) => line.received > 0)) {
+      throw new Error("Barang yang sudah diterima tidak bisa dibatalkan.");
+    }
+    if (purchase.status === "dipesan" && !canPlacePurchase(actor.role)) {
+      throw new Error("Hanya pemilik yang membatalkan pesanan.");
+    }
+    tx.update(ref, { status: "batal" });
+    queueActivity(tx, {
+      actor,
+      action: "ubah",
+      entity: "pembelian",
+      entityId: id,
+      label: `${purchase.no} dibatalkan`,
+      changes: fieldChanges(
+        { Status: purchaseStatusLabel[purchase.status] },
+        { Status: purchaseStatusLabel.batal },
+      ),
+    });
+  });
+}
+
+export async function receivePurchase(
+  id: string,
+  inputLines: { productId: string; qty: number }[],
+  actor: ActivityActor,
+) {
+  const qtyByProduct = new Map<string, number>();
+  for (const line of inputLines) {
+    if (!line.productId || !Number.isInteger(line.qty) || line.qty <= 0) continue;
+    qtyByProduct.set(line.productId, (qtyByProduct.get(line.productId) ?? 0) + line.qty);
+  }
+  if (qtyByProduct.size === 0) throw new Error("Isi jumlah barang yang datang.");
+
+  const database = store();
+  await database.runTransaction(async (tx) => {
+    const ref = database.collection("purchases").doc(id);
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw new Error("Pembelian tidak ditemukan.");
+    const purchase = mapPurchase(snap.id, snap.data() ?? {});
+    if (purchase.status !== "dipesan" && purchase.status !== "sebagian") {
+      throw new Error("Barang diterima dari pesanan yang sudah dikirim.");
+    }
+    const productSnaps = [];
+    for (const productId of qtyByProduct.keys()) {
+      productSnaps.push(await tx.get(database.collection("products").doc(productId)));
+    }
+    const nextLines = purchase.lines.map((line) => ({ ...line }));
+    const receiptLines: PurchaseReceipt["lines"] = [];
+    const stockLogs: ActivityChange[] = [];
+    for (const productSnap of productSnaps) {
+      const qty = qtyByProduct.get(productSnap.id) ?? 0;
+      if (!qty) continue;
+      const line = nextLines.find((item) => item.productId === productSnap.id);
+      if (!line) throw new Error("Barang ini tidak ada di pesanan.");
+      const remaining = line.qty - line.received;
+      if (qty > remaining) throw new Error(`Jumlah ${line.name} melebihi sisa pesanan.`);
+      if (!productSnap.exists) throw new Error("Produk tidak ditemukan.");
+      const beforeStock = num(productSnap.data()?.stock);
+      const beforeCost = num(productSnap.data()?.cost);
+      tx.update(productSnap.ref, { stock: beforeStock + qty, cost: line.cost });
+      line.received += qty;
+      receiptLines.push({ productId: line.productId, name: line.name, qty });
+      stockLogs.push({
+        field: `Stok ${line.name}`,
+        before: String(beforeStock),
+        after: String(beforeStock + qty),
+      });
+      if (beforeCost !== line.cost) {
+        stockLogs.push({
+          field: `Harga pokok ${line.name}`,
+          before: rupiah(beforeCost),
+          after: rupiah(line.cost),
+        });
+      }
+    }
+    const status: PurchaseStatus = nextLines.every((line) => line.received >= line.qty)
+      ? "diterima"
+      : "sebagian";
+    tx.update(ref, {
+      lines: nextLines,
+      status,
+      receipts: [...purchase.receipts, { at: new Date().toISOString(), lines: receiptLines }],
+    });
+    const qtyTotal = receiptLines.reduce((sum, line) => sum + line.qty, 0);
+    queueActivity(tx, {
+      actor,
+      action: "ubah",
+      entity: "pembelian",
+      entityId: id,
+      label: status === "diterima" ? `${purchase.no} diterima lengkap` : `${purchase.no} menerima ${qtyTotal} barang`,
+      changes: [
+        ...fieldChanges(
+          { Status: purchaseStatusLabel[purchase.status] },
+          {
+            Status: purchaseStatusLabel[status],
+            Datang: receiptLines.map((line) => `${line.name} ×${line.qty}`).join(", "),
+          },
+        ),
+        ...stockLogs,
+      ],
+    });
+  });
 }
 
 export async function listStaff() {

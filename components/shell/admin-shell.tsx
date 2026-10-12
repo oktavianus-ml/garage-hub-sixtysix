@@ -14,10 +14,12 @@ export function AdminShell({
   children,
   user,
   allowedHrefs,
+  counts = {},
 }: {
   children: React.ReactNode;
   user: { name: string; role: Role };
   allowedHrefs: string[];
+  counts?: Record<string, number>;
 }) {
   const [railOpen, setRailOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -40,7 +42,7 @@ export function AdminShell({
           <BrandMark />
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-          <NavList showLabels allowedHrefs={allowedHrefs} />
+          <NavList showLabels allowedHrefs={allowedHrefs} counts={counts} />
         </div>
       </aside>
 
@@ -67,6 +69,7 @@ export function AdminShell({
             showLabels={railOpen}
             onNavigate={() => setRailOpen(false)}
             allowedHrefs={allowedHrefs}
+            counts={counts}
           />
         </div>
         <button
@@ -100,6 +103,7 @@ export function AdminShell({
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         allowedHrefs={allowedHrefs}
+        counts={counts}
       />
     </div>
   );
