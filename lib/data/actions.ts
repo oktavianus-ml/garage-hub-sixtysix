@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { guard } from "@/lib/auth/guard";
 import { isRole } from "@/lib/auth/roles";
 import { bikeSelectionError } from "@/lib/data/bikes";
+import { accountCodeError, isAccountKind } from "@/lib/data/account-types";
+import { saveChartAccount, seedChartAccounts } from "@/lib/data/accounts";
 import { saveBudget } from "@/lib/data/budget";
 import { asInt, isBusinessDay } from "@/lib/data/format";
 import { parsePayMethod } from "@/lib/data/payment";
@@ -618,4 +620,46 @@ export async function saveBudgetAction(_prev: FormState, formData: FormData): Pr
     return fail(error);
   }
   redirect(`/audit?bulan=${month}`);
+}
+
+export async function saveAccountAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const access = await guard("/akun");
+  if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const code = String(formData.get("code") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const kind = String(formData.get("kind") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+  const active = String(formData.get("active") ?? "") !== "0";
+  const codeError = accountCodeError(code);
+  if (codeError) return { message: codeError };
+  if (name.length < 2 || name.length > 80) return { message: "Isi nama akun." };
+  if (!isAccountKind(kind)) return { message: "Pilih jenis akun." };
+  if (note.length > 160) return { message: "Catatan terlalu panjang." };
+  try {
+    await saveChartAccount(
+      {
+        id: String(formData.get("id") ?? "") || undefined,
+        code,
+        name,
+        kind,
+        note,
+        active,
+      },
+      access.user,
+    );
+  } catch (error) {
+    return fail(error);
+  }
+  redirect("/akun");
+}
+
+export async function seedAccountsAction(_prev: FormState, _formData: FormData): Promise<FormState> {
+  const access = await guard("/akun");
+  if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  try {
+    await seedChartAccounts(access.user);
+  } catch (error) {
+    return fail(error);
+  }
+  redirect("/akun");
 }
