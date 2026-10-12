@@ -22,6 +22,7 @@ const byRole: Record<Role, Record<string, Access>> = {
     "/pelanggan": "read",
     "/produk": "read",
     "/inventori": "read",
+    "/distributor": "read",
     "/kas": "read",
     "/bagi-hasil": "read",
   },
@@ -38,6 +39,7 @@ const byRole: Record<Role, Record<string, Access>> = {
     "/": "read",
     "/produk": "write",
     "/inventori": "write",
+    "/distributor": "write",
   },
   mekanik: {
     "/": "read",
@@ -70,6 +72,7 @@ export function allowedHrefs(role: Role) {
     "/audit",
     "/akun",
     "/pegawai",
+    "/riwayat",
     "/pengaturan",
   ];
   return hrefs.filter((href) => accessFor(role, href) !== "none");

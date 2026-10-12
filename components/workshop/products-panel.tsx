@@ -55,8 +55,12 @@ export function ProductsPanel({
           <ul className="mt-2 divide-y divide-line">
             {products.map((product) => (
               <li key={product.id} className="py-3">
-                {product.code ? <p className="text-xs font-semibold tracking-wide text-muted">{product.code}</p> : null}
-                <p className="font-medium">{product.name}</p>
+                <p className="flex flex-wrap items-baseline gap-x-2">
+                  <span className="font-medium">{product.name}</span>
+                  {product.code ? (
+                    <span className="text-xs font-semibold tracking-wide text-muted">{product.code}</span>
+                  ) : null}
+                </p>
                 <p className="text-xs text-muted">
                   Pokok {rupiah(product.cost)} · jual {rupiah(product.price)} · {product.unit}
                 </p>

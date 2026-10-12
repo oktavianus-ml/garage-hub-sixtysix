@@ -109,8 +109,12 @@ export function DashboardHome({
               {lowStock.map((item) => (
                 <li key={item.id} className="flex items-center justify-between gap-3 py-3">
                   <div>
-                    {item.code ? <p className="text-xs font-semibold tracking-wide text-muted">{item.code}</p> : null}
-                    <p className="text-sm font-medium">{item.name}</p>
+                    <p className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="text-sm font-medium">{item.name}</span>
+                      {item.code ? (
+                        <span className="text-xs font-semibold tracking-wide text-muted">{item.code}</span>
+                      ) : null}
+                    </p>
                     <p className="text-xs text-muted">Batas aman {item.safetyStock}</p>
                   </div>
                   <p className="text-sm font-semibold text-danger tabular-nums">sisa {item.stock}</p>

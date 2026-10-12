@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { Bike, List, Search, UserPlus } from "lucide-react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { Bike, List, Pencil, Search, UserPlus } from "lucide-react";
 import { saveCustomerAction, saveVehicleAction } from "@/lib/data/actions";
 import { OTHER_BIKE, bikeBrands, bikeTypes, yearsForBike } from "@/lib/data/bikes";
 import type { Customer, Vehicle } from "@/lib/data/records";
@@ -21,8 +21,41 @@ const bikeFilters = [
 
 type BikeFilter = (typeof bikeFilters)[number]["id"];
 
+function RecordMark({ kind }: { kind: "baru" | "revisi" }) {
+  const revisi = kind === "revisi";
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+        revisi ? "bg-teal-soft text-teal" : "bg-amber-soft text-amber",
+      )}
+    >
+      {revisi ? "Sudah terdaftar" : "Baru"}
+    </span>
+  );
+}
+
 function compact(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function vehicleChoices(vehicle: Vehicle) {
+  const knownBrand = bikeBrands().includes(vehicle.brand);
+  if (!knownBrand) {
+    return {
+      brandChoice: OTHER_BIKE,
+      typeChoice: "",
+      customBrand: vehicle.brand,
+      customType: vehicle.bikeType,
+    };
+  }
+  const knownType = bikeTypes(vehicle.brand).includes(vehicle.bikeType);
+  return {
+    brandChoice: vehicle.brand,
+    typeChoice: knownType ? vehicle.bikeType : OTHER_BIKE,
+    customBrand: "",
+    customType: knownType ? "" : vehicle.bikeType,
+  };
 }
 
 function matchesQuery(customer: Customer, bikes: Vehicle[], query: string) {
@@ -53,10 +86,23 @@ export function CustomersPanel({
 }) {
   const [customerState, customerAction, customerPending] = useActionState(saveCustomerAction, null);
   const [vehicleState, vehicleAction, vehiclePending] = useActionState(saveVehicleAction, null);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
   const [customerId, setCustomerId] = useState(selectedCustomerId);
+  const [plate, setPlate] = useState("");
   const [brandChoice, setBrandChoice] = useState("");
   const [typeChoice, setTypeChoice] = useState("");
   const [yearChoice, setYearChoice] = useState("");
+  const [customBrand, setCustomBrand] = useState("");
+  const [customType, setCustomType] = useState("");
+  const customerCardRef = useRef<HTMLDivElement>(null);
+  const vehicleCardRef = useRef<HTMLDivElement>(null);
+  const customerSnapshot = customers.map((customer) => `${customer.id}:${customer.name}:${customer.phone}`).join("|");
+  const vehicleSnapshot = vehicles
+    .map((vehicle) => `${vehicle.id}:${vehicle.plate}:${vehicle.brand}:${vehicle.bikeType}:${vehicle.year}`)
+    .join("|");
   const brandIsOther = brandChoice === OTHER_BIKE;
   const typeIsOther = typeChoice === OTHER_BIKE;
   const types = brandChoice && !brandIsOther ? bikeTypes(brandChoice) : [];
@@ -67,31 +113,135 @@ export function CustomersPanel({
       : typeChoice
         ? yearsForBike(brandChoice, typeChoice)
         : [];
+  const yearList =
+    yearChoice && !years.includes(Number(yearChoice)) ? [Number(yearChoice), ...years] : years;
+
+  function beginCustomerEdit(customer: Customer) {
+    setEditingCustomer(customer);
+    setCustomerName(customer.name);
+    setCustomerPhone(customer.phone);
+    customerCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function cancelCustomerEdit() {
+    setEditingCustomer(null);
+    setCustomerName("");
+    setCustomerPhone("");
+  }
+
+  function beginVehicleEdit(vehicle: Vehicle) {
+    const choices = vehicleChoices(vehicle);
+    setEditingVehicle(vehicle);
+    setCustomerId(vehicle.customerId);
+    setPlate(vehicle.plate);
+    setBrandChoice(choices.brandChoice);
+    setTypeChoice(choices.typeChoice);
+    setYearChoice(String(vehicle.year));
+    setCustomBrand(choices.customBrand);
+    setCustomType(choices.customType);
+    vehicleCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  useEffect(() => {
+    setEditingCustomer(null);
+    setCustomerName("");
+    setCustomerPhone("");
+    setEditingVehicle(null);
+    setCustomerId(selectedCustomerId);
+    setPlate("");
+    setBrandChoice("");
+    setTypeChoice("");
+    setYearChoice("");
+    setCustomBrand("");
+    setCustomType("");
+  }, [customerSnapshot, selectedCustomerId, vehicleSnapshot]);
+
+  function cancelVehicleEdit() {
+    setEditingVehicle(null);
+    setCustomerId(selectedCustomerId);
+    setPlate("");
+    setBrandChoice("");
+    setTypeChoice("");
+    setYearChoice("");
+    setCustomBrand("");
+    setCustomType("");
+  }
 
   return (
     <div className="mt-5 grid items-stretch gap-4 lg:grid-cols-2">
       {canWrite ? (
-        <GlassCard accent className="flex h-full flex-col p-4">
-          <SectionTitle icon={UserPlus}>Pelanggan baru</SectionTitle>
+        <div ref={customerCardRef} className="h-full">
+          <GlassCard
+            accent={!editingCustomer}
+            className={cn("flex h-full flex-col p-4", editingCustomer && "border-t-2 border-t-teal")}
+          >
+          <div className="flex items-start justify-between gap-3">
+            <SectionTitle icon={editingCustomer ? Pencil : UserPlus} tone={editingCustomer ? "teal" : "amber"}>
+              {editingCustomer ? "Ubah pelanggan" : "Pelanggan baru"}
+            </SectionTitle>
+            <RecordMark kind={editingCustomer ? "revisi" : "baru"} />
+          </div>
           <form action={customerAction} className="mt-3 flex flex-1 flex-col gap-3">
-            <input name="name" required placeholder="Nama" className={inputClass} />
-            <input name="phone" placeholder="Telepon" className={inputClass} />
+            {editingCustomer ? <input type="hidden" name="id" value={editingCustomer.id} /> : null}
+            <input
+              name="name"
+              required
+              placeholder="Nama"
+              className={inputClass}
+              value={customerName}
+              onChange={(event) => setCustomerName(event.target.value)}
+            />
+            <input
+              name="phone"
+              placeholder="Telepon"
+              className={inputClass}
+              value={customerPhone}
+              onChange={(event) => setCustomerPhone(event.target.value)}
+            />
             {customerState?.message ? <p className="text-sm text-danger">{customerState.message}</p> : null}
             <p className="mt-auto text-sm leading-6 text-muted">
-              Simpan dulu. Nama ini langsung terpilih di kartu motor.
+              {editingCustomer
+                ? "Perubahan menimpa nama dan telepon pelanggan ini."
+                : "Simpan dulu. Nama ini langsung terpilih di kartu motor."}
             </p>
-            <SaveButton pending={customerPending}>Simpan pelanggan</SaveButton>
+            <div className="flex gap-2">
+              {editingCustomer ? (
+                <button
+                  type="button"
+                  className="h-11 rounded-xl border border-line bg-chip px-4 text-sm font-semibold"
+                  onClick={cancelCustomerEdit}
+                >
+                  Batal
+                </button>
+              ) : null}
+              <SaveButton pending={customerPending} className="flex-1">
+                {editingCustomer ? "Simpan perubahan" : "Simpan pelanggan"}
+              </SaveButton>
+            </div>
           </form>
-        </GlassCard>
+          </GlassCard>
+        </div>
       ) : null}
       {canWrite ? (
-        <GlassCard accent className="flex h-full flex-col p-4">
-          <SectionTitle icon={Bike}>Motor pelanggan</SectionTitle>
+        <div ref={vehicleCardRef} className="h-full">
+          <GlassCard
+            accent={!editingVehicle}
+            className={cn("flex h-full flex-col p-4", editingVehicle && "border-t-2 border-t-teal")}
+          >
+          <div className="flex items-start justify-between gap-3">
+            <SectionTitle icon={editingVehicle ? Pencil : Bike} tone={editingVehicle ? "teal" : "amber"}>
+              {editingVehicle ? "Ubah motor" : "Motor pelanggan"}
+            </SectionTitle>
+            <RecordMark kind={editingVehicle ? "revisi" : "baru"} />
+          </div>
           <form action={vehicleAction} className="mt-3 flex flex-1 flex-col gap-3">
+            {editingVehicle ? <input type="hidden" name="id" value={editingVehicle.id} /> : null}
+            {editingVehicle ? <input type="hidden" name="customerId" value={editingVehicle.customerId} /> : null}
             <select
-              name="customerId"
-              required
-              className={inputClass}
+              name={editingVehicle ? undefined : "customerId"}
+              required={!editingVehicle}
+              disabled={Boolean(editingVehicle)}
+              className={cn(inputClass, editingVehicle && "opacity-70")}
               value={customerId}
               onChange={(event) => setCustomerId(event.target.value)}
             >
@@ -104,7 +254,14 @@ export function CustomersPanel({
                 </option>
               ))}
             </select>
-            <input name="plate" required placeholder="Plat" className={inputClass} />
+            <input
+              name="plate"
+              required
+              placeholder="Plat"
+              className={inputClass}
+              value={plate}
+              onChange={(event) => setPlate(event.target.value)}
+            />
             <select
               required
               className={inputClass}
@@ -114,6 +271,8 @@ export function CustomersPanel({
                 setBrandChoice(event.target.value);
                 setTypeChoice("");
                 setYearChoice("");
+                setCustomBrand("");
+                setCustomType("");
               }}
             >
               <option value="" disabled>
@@ -127,7 +286,14 @@ export function CustomersPanel({
               <option value={OTHER_BIKE}>{OTHER_BIKE}</option>
             </select>
             {brandIsOther ? (
-              <input name="brand" required placeholder="Merk" className={inputClass} />
+              <input
+                name="brand"
+                required
+                placeholder="Merk"
+                className={inputClass}
+                value={customBrand}
+                onChange={(event) => setCustomBrand(event.target.value)}
+              />
             ) : (
               <select
                 required
@@ -138,6 +304,7 @@ export function CustomersPanel({
                 onChange={(event) => {
                   setTypeChoice(event.target.value);
                   setYearChoice("");
+                  setCustomType("");
                 }}
               >
                 <option value="" disabled>
@@ -152,7 +319,14 @@ export function CustomersPanel({
               </select>
             )}
             {brandIsOther || typeIsOther ? (
-              <input name="bikeType" required placeholder="Tipe" className={inputClass} />
+              <input
+                name="bikeType"
+                required
+                placeholder="Tipe"
+                className={inputClass}
+                value={customType}
+                onChange={(event) => setCustomType(event.target.value)}
+              />
             ) : null}
             <select
               name="year"
@@ -165,20 +339,45 @@ export function CustomersPanel({
               <option value="" disabled>
                 Pilih tahun
               </option>
-              {years.map((year) => (
+              {yearList.map((year) => (
                 <option key={year} value={year}>
                   {year}
                 </option>
               ))}
             </select>
             {vehicleState?.message ? <p className="text-sm text-danger">{vehicleState.message}</p> : null}
-            <SaveButton pending={vehiclePending} disabled={customers.length === 0} className="mt-auto">
-              Simpan motor
-            </SaveButton>
+            {editingVehicle ? (
+              <p className="mt-auto text-sm leading-6 text-muted">
+                Hanya motor ini yang berubah. Motor lain tetap seperti semula.
+              </p>
+            ) : null}
+            <div className={cn("flex gap-2", !editingVehicle && "mt-auto")}>
+              {editingVehicle ? (
+                <button
+                  type="button"
+                  className="h-11 rounded-xl border border-line bg-chip px-4 text-sm font-semibold"
+                  onClick={cancelVehicleEdit}
+                >
+                  Batal
+                </button>
+              ) : null}
+              <SaveButton pending={vehiclePending} disabled={customers.length === 0} className="flex-1">
+                {editingVehicle ? "Simpan perubahan" : "Simpan motor"}
+              </SaveButton>
+            </div>
           </form>
-        </GlassCard>
+          </GlassCard>
+        </div>
       ) : null}
-      <CustomerDirectory customers={customers} vehicles={vehicles} />
+      <CustomerDirectory
+        customers={customers}
+        vehicles={vehicles}
+        canWrite={canWrite}
+        editingCustomerId={editingCustomer?.id ?? ""}
+        editingVehicleId={editingVehicle?.id ?? ""}
+        onEditCustomer={beginCustomerEdit}
+        onEditVehicle={beginVehicleEdit}
+      />
     </div>
   );
 }
@@ -186,9 +385,19 @@ export function CustomersPanel({
 function CustomerDirectory({
   customers,
   vehicles,
+  canWrite,
+  editingCustomerId,
+  editingVehicleId,
+  onEditCustomer,
+  onEditVehicle,
 }: {
   customers: Customer[];
   vehicles: Vehicle[];
+  canWrite: boolean;
+  editingCustomerId: string;
+  editingVehicleId: string;
+  onEditCustomer: (customer: Customer) => void;
+  onEditVehicle: (vehicle: Vehicle) => void;
 }) {
   const [query, setQuery] = useState("");
   const [bikeFilter, setBikeFilter] = useState<BikeFilter>("semua");
@@ -277,17 +486,50 @@ function CustomerDirectory({
             <ul className="mt-2 divide-y divide-line">
               {visible.map((customer) => {
                 const bikes = bikesByCustomer.get(customer.id) ?? [];
+                const editingThis = editingCustomerId === customer.id;
                 return (
-                  <li key={customer.id} className="py-3">
-                    <p className="font-medium">{customer.name}</p>
+                  <li
+                    key={customer.id}
+                    className={cn("py-3", editingThis && "-mx-2 rounded-xl bg-teal-soft px-2")}
+                  >
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <p className="font-medium">{customer.name}</p>
+                      {canWrite ? (
+                        <button
+                          type="button"
+                          className="text-xs font-semibold text-teal"
+                          onClick={() => onEditCustomer(customer)}
+                        >
+                          Ubah
+                        </button>
+                      ) : null}
+                    </div>
                     <p className="text-xs text-muted">{customer.phone || "Tanpa telepon"}</p>
                     {bikes.length === 0 ? (
                       <p className="mt-1 text-sm text-muted">Belum ada motor.</p>
                     ) : (
                       <ul className="mt-2 flex flex-col gap-1">
                         {bikes.map((bike) => (
-                          <li key={bike.id} className="text-sm">
-                            {bike.plate} · {bike.brand} {bike.bikeType} · {bike.year}
+                          <li
+                            key={bike.id}
+                            className={cn(
+                              "flex flex-wrap items-center gap-1.5 rounded-lg py-0.5 text-sm",
+                              editingVehicleId === bike.id && "bg-teal-soft px-2 ring-1 ring-teal/30",
+                            )}
+                          >
+                            <span>
+                              {bike.plate} · {bike.brand} {bike.bikeType} · {bike.year}
+                            </span>
+                            {canWrite ? (
+                              <button
+                                type="button"
+                                aria-label={`Ubah motor ${bike.plate}`}
+                                className="inline-flex size-7 items-center justify-center rounded-lg text-teal"
+                                onClick={() => onEditVehicle(bike)}
+                              >
+                                <Pencil className="size-3.5" aria-hidden />
+                              </button>
+                            ) : null}
                           </li>
                         ))}
                       </ul>

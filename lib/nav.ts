@@ -3,6 +3,7 @@ import {
   ClipboardList,
   FileSpreadsheet,
   HardHat,
+  History,
   LayoutDashboard,
   Package,
   PieChart,
@@ -155,6 +156,12 @@ export const navGroups: NavGroup[] = [
   {
     label: "Pengaturan",
     items: [
+      {
+        label: "Riwayat",
+        href: "/riwayat",
+        icon: History,
+        description: "Jejak siapa yang mengubah data bengkel, dan apa yang berubah.",
+      },
       {
         label: "Pengaturan",
         href: "/pengaturan",

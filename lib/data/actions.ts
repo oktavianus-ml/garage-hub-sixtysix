@@ -10,6 +10,7 @@ import {
   createStaff,
   saveCashDay,
   saveCustomer,
+  saveDistributor,
   saveProduct,
   saveProfitSplit,
   saveServiceOrder,
@@ -41,11 +42,14 @@ export async function saveCustomerAction(_prev: FormState, formData: FormData): 
   if (name.length < 2) return { message: "Isi nama pelanggan." };
   let id = "";
   try {
-    id = await saveCustomer({
-      id: String(formData.get("id") ?? "") || undefined,
-      name,
-      phone,
-    });
+    id = await saveCustomer(
+      {
+        id: String(formData.get("id") ?? "") || undefined,
+        name,
+        phone,
+      },
+      access.user,
+    );
   } catch (error) {
     return fail(error);
   }
@@ -66,14 +70,17 @@ export async function saveVehicleAction(_prev: FormState, formData: FormData): P
   const bikeError = bikeSelectionError(brand, bikeType, year);
   if (bikeError) return { message: bikeError };
   try {
-    await saveVehicle({
-      id: String(formData.get("id") ?? "") || undefined,
-      customerId,
-      plate,
-      brand,
-      bikeType,
-      year,
-    });
+    await saveVehicle(
+      {
+        id: String(formData.get("id") ?? "") || undefined,
+        customerId,
+        plate,
+        brand,
+        bikeType,
+        year,
+      },
+      access.user,
+    );
   } catch (error) {
     return fail(error);
   }
@@ -91,18 +98,51 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
     return { message: "Lengkapi kode produk, nama, harga pokok, dan harga jual." };
   }
   try {
-    await saveProduct({
-      id: String(formData.get("id") ?? "") || undefined,
-      code,
-      name,
-      unit: String(formData.get("unit") ?? "pcs").trim() || "pcs",
-      cost,
-      price,
-    });
+    await saveProduct(
+      {
+        id: String(formData.get("id") ?? "") || undefined,
+        code,
+        name,
+        unit: String(formData.get("unit") ?? "pcs").trim() || "pcs",
+        cost,
+        price,
+      },
+      access.user,
+    );
   } catch (error) {
     return fail(error);
   }
   redirect("/produk");
+}
+
+export async function saveDistributorAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const access = await guard("/distributor");
+  if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const name = String(formData.get("name") ?? "").trim();
+  const contact = String(formData.get("contact") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+  if (name.length < 2 || name.length > 80) return { message: "Isi nama distributor." };
+  if (contact.length > 80 || phone.length > 30 || address.length > 200 || note.length > 200) {
+    return { message: "Ada isian yang terlalu panjang." };
+  }
+  try {
+    await saveDistributor(
+      {
+        id: String(formData.get("id") ?? "") || undefined,
+        name,
+        contact,
+        phone,
+        address,
+        note,
+      },
+      access.user,
+    );
+  } catch (error) {
+    return fail(error);
+  }
+  redirect("/distributor");
 }
 
 export async function saveStaffAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -116,7 +156,7 @@ export async function saveStaffAction(_prev: FormState, formData: FormData): Pro
     return { message: "Isi nama, email, kata sandi minimal 8 karakter, dan peran." };
   }
   try {
-    await createStaff({ name, email, password, role });
+    await createStaff({ name, email, password, role }, access.user);
   } catch (error) {
     return fail(error);
   }
@@ -148,7 +188,7 @@ export async function saveServiceAction(_prev: FormState, formData: FormData): P
         parts,
         status,
       },
-      access.user.role,
+      access.user,
     );
   } catch (error) {
     return fail(error);
@@ -167,7 +207,7 @@ export async function saveSaleAction(_prev: FormState, formData: FormData): Prom
     return { message: "Daftar barang tidak valid." };
   }
   try {
-    await saveWalkInSale({ lines }, access.user.name);
+    await saveWalkInSale({ lines }, access.user);
   } catch (error) {
     return fail(error);
   }
@@ -181,12 +221,15 @@ export async function saveCashAction(_prev: FormState, formData: FormData): Prom
   const counted = asInt(formData.get("counted"));
   if (cashOut === null || counted === null) return { message: "Isi pengeluaran kas dan uang yang dihitung." };
   try {
-    await saveCashDay({
-      day: jakartaDate(),
-      cashOut,
-      counted,
-      note: String(formData.get("note") ?? "").trim(),
-    });
+    await saveCashDay(
+      {
+        day: jakartaDate(),
+        cashOut,
+        counted,
+        note: String(formData.get("note") ?? "").trim(),
+      },
+      access.user,
+    );
   } catch (error) {
     return fail(error);
   }
@@ -202,7 +245,7 @@ export async function saveSplitAction(_prev: FormState, formData: FormData): Pro
     return { message: "Isi persentase pemilik dan investor." };
   }
   try {
-    await saveProfitSplit({ ownerPercent, investorPercent });
+    await saveProfitSplit({ ownerPercent, investorPercent }, access.user);
   } catch (error) {
     return fail(error);
   }
@@ -215,7 +258,7 @@ export async function closeMonthAction(_prev: FormState, formData: FormData): Pr
   const month = String(formData.get("month") ?? "");
   if (!/^\d{4}-\d{2}$/.test(month)) return { message: "Pilih bulan." };
   try {
-    await closeMonth(month);
+    await closeMonth(month, access.user);
   } catch (error) {
     return fail(error);
   }

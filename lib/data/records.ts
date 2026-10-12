@@ -1,8 +1,14 @@
 import type { Transaction } from "firebase-admin/firestore";
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase/admin";
-import type { Role } from "@/lib/auth/roles";
+import { roleLabel, type Role } from "@/lib/auth/roles";
 import { canMarkPaid } from "@/lib/auth/access";
-import { jakartaDate, monthKeyOf } from "@/lib/data/format";
+import {
+  fieldChanges,
+  queueActivity,
+  type ActivityActor,
+  type ActivityChange,
+} from "@/lib/data/activity";
+import { jakartaDate, monthKeyOf, rupiah } from "@/lib/data/format";
 import { heldQty, holdDelta, type HeldPart } from "@/lib/data/stock";
 
 export type Customer = { id: string; name: string; phone: string };
@@ -23,6 +29,14 @@ export type Product = {
   price: number;
   stock: number;
   safetyStock: number;
+};
+export type Distributor = {
+  id: string;
+  name: string;
+  contact: string;
+  phone: string;
+  address: string;
+  note: string;
 };
 export type StaffUser = {
   id: string;
@@ -95,6 +109,14 @@ export type MonthClose = {
 export type ProfitSplit = { ownerPercent: number; investorPercent: number };
 
 const SPK_STATUSES: SpkStatus[] = ["antri", "dikerjakan", "selesai", "lunas", "batal"];
+
+const spkStatusLabel: Record<SpkStatus, string> = {
+  antri: "Antri",
+  dikerjakan: "Dikerjakan",
+  selesai: "Selesai",
+  lunas: "Lunas",
+  batal: "Batal",
+};
 
 function store() {
   return getAdminFirestore();
@@ -182,6 +204,54 @@ function mapOrder(id: string, data: FirebaseFirestore.DocumentData): ServiceOrde
   };
 }
 
+function priorFields(exists: boolean, fields: Record<string, string>) {
+  return exists ? fields : {};
+}
+
+function partsText(parts: PartLine[]) {
+  return parts.map((part) => `${part.name} ×${part.qty}`).join(", ");
+}
+
+function orderFields(order: {
+  customerName: string;
+  plate: string;
+  complaint: string;
+  mechanicName: string;
+  laborCost: number;
+  parts: PartLine[];
+  status: SpkStatus;
+  grand: number;
+}) {
+  return {
+    Pelanggan: order.customerName,
+    Plat: order.plate,
+    Keluhan: order.complaint,
+    Mekanik: order.mechanicName,
+    Ongkos: rupiah(order.laborCost),
+    Part: partsText(order.parts),
+    Status: spkStatusLabel[order.status],
+    Total: rupiah(order.grand),
+  };
+}
+
+function stockChanges(
+  snaps: FirebaseFirestore.DocumentSnapshot[],
+  delta: Map<string, number>,
+): ActivityChange[] {
+  return snaps.flatMap((snap) => {
+    const change = delta.get(snap.id);
+    if (!change || !snap.exists) return [];
+    const before = num(snap.data()?.stock);
+    return [
+      {
+        field: `Stok ${text(snap.data()?.name, "Produk")}`,
+        before: String(before),
+        after: String(before - change),
+      },
+    ];
+  });
+}
+
 export async function listCustomers() {
   const snap = await store().collection("customers").get();
   return snap.docs
@@ -205,37 +275,95 @@ export async function listVehicles() {
   }));
 }
 
-export async function saveCustomer(input: { id?: string; name: string; phone: string }) {
+export async function saveCustomer(
+  input: { id?: string; name: string; phone: string },
+  actor: ActivityActor,
+) {
   const ref = input.id
     ? store().collection("customers").doc(input.id)
     : store().collection("customers").doc();
-  await ref.set({ name: input.name, phone: input.phone }, { merge: true });
+  const existing = input.id ? await ref.get() : null;
+  const before = priorFields(Boolean(existing?.exists), {
+    Nama: text(existing?.data()?.name),
+    Telepon: text(existing?.data()?.phone),
+  });
+  const after = { Nama: input.name, Telepon: input.phone };
+  const batch = store().batch();
+  batch.set(ref, { name: input.name, phone: input.phone }, { merge: true });
+  queueActivity(batch, {
+    actor,
+    action: existing?.exists ? "ubah" : "buat",
+    entity: "pelanggan",
+    entityId: ref.id,
+    label: existing?.exists ? `Pelanggan ${input.name} diubah` : `Pelanggan ${input.name} dibuat`,
+    changes: fieldChanges(before, after),
+  });
+  await batch.commit();
   return ref.id;
 }
 
-export async function saveVehicle(input: {
-  id?: string;
-  customerId: string;
-  plate: string;
-  brand: string;
-  bikeType: string;
-  year: number;
-}) {
+export async function saveVehicle(
+  input: {
+    id?: string;
+    customerId: string;
+    plate: string;
+    brand: string;
+    bikeType: string;
+    year: number;
+  },
+  actor: ActivityActor,
+) {
   const customer = await store().collection("customers").doc(input.customerId).get();
   if (!customer.exists) throw new Error("Pelanggan tidak ditemukan.");
   const ref = input.id
     ? store().collection("vehicles").doc(input.id)
     : store().collection("vehicles").doc();
-  await ref.set(
+  const existing = input.id ? await ref.get() : null;
+  let previousCustomer = "";
+  if (existing?.exists) {
+    const previousId = text(existing.data()?.customerId);
+    if (previousId === input.customerId) previousCustomer = text(customer.data()?.name);
+    else if (previousId) {
+      const previous = await store().collection("customers").doc(previousId).get();
+      previousCustomer = text(previous.data()?.name);
+    }
+  }
+  const plate = input.plate.toUpperCase();
+  const before = priorFields(Boolean(existing?.exists), {
+    Pelanggan: previousCustomer,
+    Plat: text(existing?.data()?.plate),
+    Merk: text(existing?.data()?.brand),
+    Tipe: text(existing?.data()?.bikeType),
+    Tahun: String(num(existing?.data()?.year)),
+  });
+  const after = {
+    Pelanggan: text(customer.data()?.name),
+    Plat: plate,
+    Merk: input.brand,
+    Tipe: input.bikeType,
+    Tahun: String(input.year),
+  };
+  const batch = store().batch();
+  batch.set(
+    ref,
     {
       customerId: input.customerId,
-      plate: input.plate.toUpperCase(),
+      plate,
       brand: input.brand,
       bikeType: input.bikeType,
       year: input.year,
     },
     { merge: true },
   );
+  queueActivity(batch, {
+    actor,
+    action: existing?.exists ? "ubah" : "buat",
+    entity: "motor",
+    entityId: ref.id,
+    label: existing?.exists ? `Motor ${plate} diubah` : `Motor ${plate} dibuat`,
+    changes: fieldChanges(before, after),
+  });
+  await batch.commit();
 }
 
 export async function listProducts() {
@@ -254,34 +382,136 @@ export async function listProducts() {
     .sort((a, b) => a.name.localeCompare(b.name, "id"));
 }
 
-export async function saveProduct(input: {
-  id?: string;
-  code: string;
-  name: string;
-  unit: string;
-  cost: number;
-  price: number;
-}) {
+export async function saveProduct(
+  input: {
+    id?: string;
+    code: string;
+    name: string;
+    unit: string;
+    cost: number;
+    price: number;
+  },
+  actor: ActivityActor,
+) {
   const code = input.code.trim().toUpperCase();
   if (!code) throw new Error("Isi kode produk.");
   const ref = input.id
     ? store().collection("products").doc(input.id)
     : store().collection("products").doc();
-  const taken = await store().collection("products").where("code", "==", code).limit(1).get();
+  const [taken, existing] = await Promise.all([
+    store().collection("products").where("code", "==", code).limit(1).get(),
+    input.id ? ref.get() : Promise.resolve(null),
+  ]);
   if (!taken.empty && taken.docs[0]?.id !== ref.id) {
     throw new Error("Kode produk sudah dipakai.");
   }
-  await ref.set(
+  const creating = !existing?.exists;
+  const unit = input.unit || "pcs";
+  const before = priorFields(Boolean(existing?.exists), {
+    Kode: text(existing?.data()?.code),
+    Nama: text(existing?.data()?.name),
+    Satuan: text(existing?.data()?.unit, "pcs"),
+    "Harga pokok": rupiah(num(existing?.data()?.cost)),
+    "Harga jual": rupiah(num(existing?.data()?.price)),
+  });
+  const after = {
+    Kode: code,
+    Nama: input.name,
+    Satuan: unit,
+    "Harga pokok": rupiah(input.cost),
+    "Harga jual": rupiah(input.price),
+    ...(creating ? { Stok: "0" } : {}),
+  };
+  const batch = store().batch();
+  batch.set(
+    ref,
     {
       code,
       name: input.name,
-      unit: input.unit || "pcs",
+      unit,
       cost: input.cost,
       price: input.price,
-      ...(input.id ? {} : { stock: 0, safetyStock: 0 }),
+      ...(creating ? { stock: 0, safetyStock: 0 } : {}),
     },
     { merge: true },
   );
+  queueActivity(batch, {
+    actor,
+    action: creating ? "buat" : "ubah",
+    entity: "produk",
+    entityId: ref.id,
+    label: creating ? `Produk ${input.name} dibuat` : `Produk ${input.name} diubah`,
+    changes: fieldChanges(before, after),
+  });
+  await batch.commit();
+}
+
+export async function listDistributors() {
+  const snap = await store().collection("distributors").get();
+  return snap.docs
+    .map((doc) => ({
+      id: doc.id,
+      name: text(doc.data().name),
+      contact: text(doc.data().contact),
+      phone: text(doc.data().phone),
+      address: text(doc.data().address),
+      note: text(doc.data().note),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "id"));
+}
+
+export async function saveDistributor(
+  input: {
+    id?: string;
+    name: string;
+    contact: string;
+    phone: string;
+    address: string;
+    note: string;
+  },
+  actor: ActivityActor,
+) {
+  const ref = input.id
+    ? store().collection("distributors").doc(input.id)
+    : store().collection("distributors").doc();
+  const existing = input.id ? await ref.get() : null;
+  if (input.id && !existing?.exists) throw new Error("Distributor tidak ditemukan.");
+  const before = priorFields(Boolean(existing?.exists), {
+    Nama: text(existing?.data()?.name),
+    Kontak: text(existing?.data()?.contact),
+    Telepon: text(existing?.data()?.phone),
+    Alamat: text(existing?.data()?.address),
+    Catatan: text(existing?.data()?.note),
+  });
+  const after = {
+    Nama: input.name,
+    Kontak: input.contact,
+    Telepon: input.phone,
+    Alamat: input.address,
+    Catatan: input.note,
+  };
+  const batch = store().batch();
+  batch.set(
+    ref,
+    {
+      name: input.name,
+      contact: input.contact,
+      phone: input.phone,
+      address: input.address,
+      note: input.note,
+    },
+    { merge: true },
+  );
+  queueActivity(batch, {
+    actor,
+    action: existing?.exists ? "ubah" : "buat",
+    entity: "distributor",
+    entityId: ref.id,
+    label: existing?.exists ? `Distributor ${input.name} diubah` : `Distributor ${input.name} dibuat`,
+    changes: fieldChanges(before, after),
+  });
+  await batch.commit();
+  return ref.id;
 }
 
 export async function listStaff() {
@@ -298,23 +528,44 @@ export async function listStaff() {
     .sort((a, b) => a.name.localeCompare(b.name, "id"));
 }
 
-export async function createStaff(input: {
-  name: string;
-  email: string;
-  password: string;
-  role: Role;
-}) {
+export async function createStaff(
+  input: {
+    name: string;
+    email: string;
+    password: string;
+    role: Role;
+  },
+  actor: ActivityActor,
+) {
   const created = await getAdminAuth().createUser({
     email: input.email,
     password: input.password,
     displayName: input.name,
   });
-  await store().collection("users").doc(created.uid).set({
+  const ref = store().collection("users").doc(created.uid);
+  const batch = store().batch();
+  batch.set(ref, {
     name: input.name,
     email: input.email,
     role: input.role,
     active: true,
   });
+  queueActivity(batch, {
+    actor,
+    action: "buat",
+    entity: "pegawai",
+    entityId: created.uid,
+    label: `${input.name} ditambahkan sebagai ${roleLabel[input.role]}`,
+    changes: fieldChanges(
+      {},
+      {
+        Nama: input.name,
+        Email: input.email,
+        Peran: roleLabel[input.role],
+      },
+    ),
+  });
+  await batch.commit();
 }
 
 export async function listOrders() {
@@ -341,8 +592,9 @@ export async function saveServiceOrder(
     parts: { productId: string; qty: number }[];
     status: SpkStatus;
   },
-  role: Role,
+  actor: ActivityActor,
 ) {
+  const role = actor.role;
   if (!SPK_STATUSES.includes(input.status)) throw new Error("Status tidak dikenal.");
   if ((input.status === "lunas" || input.status === "batal") && !canMarkPaid(role)) {
     throw new Error("Hanya kasir atau pemilik yang menandai lunas dan batal.");
@@ -404,32 +656,59 @@ export async function saveServiceOrder(
     }
     const after = heldQty(parts, input.status);
     const no = existing?.no ?? (await takeNumber(tx, "SPK"));
-    writeStock(tx, productSnaps, holdDelta(before, after));
+    const delta = holdDelta(before, after);
+    writeStock(tx, productSnaps, delta);
     const partsSell = parts.reduce((sum, part) => sum + part.qty * part.price, 0);
     const partsCost = parts.reduce((sum, part) => sum + part.qty * part.cost, 0);
     const vehicleData = vehicle.data() ?? {};
-
-    tx.set(ref, {
-      no,
-      customerId: input.customerId,
+    const next = {
       customerName: text(customer.data()?.name),
-      vehicleId: input.vehicleId,
       plate: text(vehicleData.plate),
-      brand: text(vehicleData.brand),
-      bikeType: text(vehicleData.bikeType),
-      year: num(vehicleData.year),
       complaint: input.complaint,
-      mechanicId: input.mechanicId,
       mechanicName: text(mechanic.data()?.name),
       laborCost: input.laborCost,
       parts,
       status: input.status,
+      grand: partsSell + input.laborCost,
+    };
+
+    tx.set(ref, {
+      no,
+      customerId: input.customerId,
+      customerName: next.customerName,
+      vehicleId: input.vehicleId,
+      plate: next.plate,
+      brand: text(vehicleData.brand),
+      bikeType: text(vehicleData.bikeType),
+      year: num(vehicleData.year),
+      complaint: next.complaint,
+      mechanicId: input.mechanicId,
+      mechanicName: next.mechanicName,
+      laborCost: next.laborCost,
+      parts,
+      status: next.status,
       partsSell,
       partsCost,
-      grand: partsSell + input.laborCost,
+      grand: next.grand,
       paidDate,
       monthKey: paidDate ? monthKeyOf(paidDate) : null,
       createdAt: existing?.createdAt || new Date().toISOString(),
+    });
+    const statusChanged = existing && existing.status !== input.status;
+    queueActivity(tx, {
+      actor,
+      action: existing ? "ubah" : "buat",
+      entity: "spk",
+      entityId: ref.id,
+      label: !existing
+        ? `${no} dibuat`
+        : statusChanged
+          ? `${no} jadi ${spkStatusLabel[input.status].toLowerCase()}`
+          : `${no} diubah`,
+      changes: [
+        ...fieldChanges(existing ? orderFields(existing) : {}, orderFields(next)),
+        ...stockChanges(productSnaps, delta),
+      ],
     });
   });
 }
@@ -456,7 +735,7 @@ export async function listSales() {
 
 export async function saveWalkInSale(
   input: { lines: { productId: string; qty: number }[] },
-  cashierName: string,
+  actor: ActivityActor,
 ) {
   if (input.lines.length === 0) throw new Error("Pilih barang yang dijual.");
   const qtyByProduct = new Map<string, number>();
@@ -485,18 +764,31 @@ export async function saveWalkInSale(
       };
     });
     const no = await takeNumber(tx, "KSR");
-    writeStock(tx, snaps, holdDelta(new Map(), heldQty(lines, "lunas")));
+    const delta = holdDelta(new Map(), heldQty(lines, "lunas"));
+    writeStock(tx, snaps, delta);
     const total = lines.reduce((sum, line) => sum + line.qty * line.price, 0);
     const costTotal = lines.reduce((sum, line) => sum + line.qty * line.cost, 0);
-    tx.set(database.collection("walkInSales").doc(), {
+    const saleRef = database.collection("walkInSales").doc();
+    tx.set(saleRef, {
       no,
-      cashierName,
+      cashierName: actor.name,
       lines,
       total,
       costTotal,
       businessDate: day,
       monthKey: month,
       createdAt: new Date().toISOString(),
+    });
+    queueActivity(tx, {
+      actor,
+      action: "buat",
+      entity: "kasir",
+      entityId: saleRef.id,
+      label: `${no} terjual`,
+      changes: [
+        ...fieldChanges({}, { Barang: partsText(lines), Total: rupiah(total) }),
+        ...stockChanges(snaps, delta),
+      ],
     });
   });
 }
@@ -529,22 +821,45 @@ export async function getCashDay(day: string): Promise<CashDay | null> {
   };
 }
 
-export async function saveCashDay(input: {
-  day: string;
-  cashOut: number;
-  counted: number;
-  note: string;
-}) {
+export async function saveCashDay(
+  input: {
+    day: string;
+    cashOut: number;
+    counted: number;
+    note: string;
+  },
+  actor: ActivityActor,
+) {
   const month = monthKeyOf(input.day);
   const database = store();
   await database.runTransaction(async (tx) => {
     await ensureOpen(tx, month);
-    tx.set(database.collection("cashDays").doc(input.day), {
+    const ref = database.collection("cashDays").doc(input.day);
+    const existing = await tx.get(ref);
+    const before = priorFields(existing.exists, {
+      Pengeluaran: rupiah(num(existing.data()?.cashOut)),
+      Dihitung: rupiah(num(existing.data()?.counted)),
+      Catatan: text(existing.data()?.note),
+    });
+    const after = {
+      Pengeluaran: rupiah(input.cashOut),
+      Dihitung: rupiah(input.counted),
+      Catatan: input.note,
+    };
+    tx.set(ref, {
       cashOut: input.cashOut,
       counted: input.counted,
       note: input.note,
       closedAt: new Date().toISOString(),
       monthKey: month,
+    });
+    queueActivity(tx, {
+      actor,
+      action: existing.exists ? "ubah" : "buat",
+      entity: "kas",
+      entityId: input.day,
+      label: existing.exists ? `Kas ${input.day} diubah` : `Kas ${input.day} ditutup`,
+      changes: fieldChanges(before, after),
     });
   });
 }
@@ -557,11 +872,31 @@ export async function getProfitSplit(): Promise<ProfitSplit> {
   };
 }
 
-export async function saveProfitSplit(split: ProfitSplit) {
+export async function saveProfitSplit(split: ProfitSplit, actor: ActivityActor) {
   if (split.ownerPercent + split.investorPercent !== 100) {
     throw new Error("Persentase pemilik dan investor harus 100.");
   }
-  await store().doc("settings/profitSplit").set(split);
+  const ref = store().doc("settings/profitSplit");
+  const existing = await ref.get();
+  const before = priorFields(existing.exists, {
+    "Persen pemilik": `${num(existing.data()?.ownerPercent)}%`,
+    "Persen investor": `${num(existing.data()?.investorPercent)}%`,
+  });
+  const after = {
+    "Persen pemilik": `${split.ownerPercent}%`,
+    "Persen investor": `${split.investorPercent}%`,
+  };
+  const batch = store().batch();
+  batch.set(ref, split);
+  queueActivity(batch, {
+    actor,
+    action: existing.exists ? "ubah" : "buat",
+    entity: "bagi-hasil",
+    entityId: "profitSplit",
+    label: existing.exists ? "Persentase bagi hasil diubah" : "Persentase bagi hasil dibuat",
+    changes: fieldChanges(before, after),
+  });
+  await batch.commit();
 }
 
 async function monthFigures(tx: Transaction, month: string) {
@@ -614,7 +949,7 @@ export async function previewMonth(month: string) {
   };
 }
 
-export async function closeMonth(month: string) {
+export async function closeMonth(month: string, actor: ActivityActor) {
   const database = store();
   await database.runTransaction(async (tx) => {
     await ensureOpen(tx, month);
@@ -623,12 +958,32 @@ export async function closeMonth(month: string) {
       throw new Error("Atur persentase pemilik dan investor dulu.");
     }
     const profit = figures.profit;
+    const ownerShare = Math.round((profit * figures.ownerPercent) / 100);
+    const investorShare = Math.round((profit * figures.investorPercent) / 100);
     tx.set(database.doc(`monthCloses/${month}`), {
       status: "closed",
       ...figures,
-      ownerShare: Math.round((profit * figures.ownerPercent) / 100),
-      investorShare: Math.round((profit * figures.investorPercent) / 100),
+      ownerShare,
+      investorShare,
       closedAt: new Date().toISOString(),
+    });
+    queueActivity(tx, {
+      actor,
+      action: "buat",
+      entity: "tutup-bulan",
+      entityId: month,
+      label: `Bulan ${month} ditutup`,
+      changes: fieldChanges(
+        {},
+        {
+          Omzet: rupiah(figures.revenue),
+          "Harga pokok": rupiah(figures.cogs),
+          "Pengeluaran kas": rupiah(figures.cashOut),
+          Laba: rupiah(profit),
+          "Bagian pemilik": `${rupiah(ownerShare)} (${figures.ownerPercent}%)`,
+          "Bagian investor": `${rupiah(investorShare)} (${figures.investorPercent}%)`,
+        },
+      ),
     });
   });
 }

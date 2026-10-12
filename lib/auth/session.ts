@@ -2,7 +2,9 @@ import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase/admin";
-import { isRole, type Role } from "@/lib/auth/roles";
+import { isRole, roleLabel, type Role } from "@/lib/auth/roles";
+import { fieldChanges, queueActivity } from "@/lib/data/activity";
+
 const FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000;
 const FIVE_DAYS_SEC = 5 * 24 * 60 * 60;
 
@@ -38,13 +40,23 @@ export async function createOwner(input: {
     displayName: name,
   });
 
-  await db.collection("users").doc(created.uid).set({
+  const batch = db.batch();
+  batch.set(db.collection("users").doc(created.uid), {
     name,
     email,
     role: "pemilik",
     active: true,
   });
-  await db.doc("meta/bootstrap").set({ ownerUid: created.uid });
+  batch.set(db.doc("meta/bootstrap"), { ownerUid: created.uid });
+  queueActivity(batch, {
+    actor: { uid: created.uid, name, role: "pemilik" },
+    action: "buat",
+    entity: "pegawai",
+    entityId: created.uid,
+    label: `Pemilik ${name} dibuat`,
+    changes: fieldChanges({}, { Nama: name, Email: email, Peran: roleLabel.pemilik }),
+  });
+  await batch.commit();
 }
 
 export async function createSessionCookie(idToken: string) {

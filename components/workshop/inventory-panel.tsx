@@ -27,8 +27,12 @@ export function InventoryPanel({ products }: { products: Product[] }) {
               return (
                 <li key={product.id} className="flex items-center justify-between gap-3 py-3">
                   <div>
-                    {product.code ? <p className="text-xs font-semibold tracking-wide text-muted">{product.code}</p> : null}
-                    <p className="font-medium">{product.name}</p>
+                    <p className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="font-medium">{product.name}</span>
+                      {product.code ? (
+                        <span className="text-xs font-semibold tracking-wide text-muted">{product.code}</span>
+                      ) : null}
+                    </p>
                     <p className="text-xs text-muted">
                       Batas aman {product.safetyStock} {product.unit} · jual {rupiah(product.price)}
                     </p>
