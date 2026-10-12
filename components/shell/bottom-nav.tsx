@@ -25,7 +25,9 @@ export function BottomNav({
     .map((href) => {
       const item = findNavItem(href);
       if (!item) return null;
-      return href === "/inventori" ? { ...item, label: "Stok" } : item;
+      if (href === "/inventori") return { ...item, label: "Stok" };
+      if (href === "/service") return { ...item, label: "Service" };
+      return item;
     })
     .filter((item) => item !== null);
 
@@ -34,30 +36,27 @@ export function BottomNav({
       aria-label="Menu singkat"
       className="glass glass-chrome fixed inset-x-0 bottom-0 z-30 rounded-none border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)] md:hidden"
     >
-      <ul
-        className="grid"
-        style={{ gridTemplateColumns: `repeat(${items.length + 1}, minmax(0, 1fr))` }}
-      >
+      <ul className="flex w-full">
         {items.map((item) => {
           const active = isActivePath(pathname, item.href);
           const Icon = item.icon;
           return (
-            <li key={item.href}>
+            <li key={item.href} className="min-w-0 flex-1 basis-0">
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 text-[11px] font-medium",
+                  "flex min-h-14 w-full flex-col items-center justify-center gap-0.5 px-1 text-center text-[11px] font-medium",
                   active ? "text-amber" : "text-muted",
                 )}
               >
-                <Icon className="size-5" aria-hidden />
-                <span className="max-w-full truncate leading-none">{item.label}</span>
+                <Icon className="size-5 shrink-0" aria-hidden />
+                <span className="w-full truncate leading-none">{item.label}</span>
               </Link>
             </li>
           );
         })}
-        <li>
+        <li className="min-w-0 flex-1 basis-0">
           <MenuButton open={menuOpen} onClick={onOpenMenu} />
         </li>
       </ul>

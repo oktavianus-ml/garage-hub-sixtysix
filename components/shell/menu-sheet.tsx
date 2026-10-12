@@ -72,7 +72,7 @@ export function MenuButton({
     <button
       type="button"
       className={cn(
-        "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
+        "flex min-h-14 w-full flex-col items-center justify-center gap-0.5 px-1 text-center text-[11px] font-medium",
         open ? "text-amber" : "text-muted",
       )}
       aria-expanded={open}
