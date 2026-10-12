@@ -19,7 +19,7 @@ export function NavList({
   counts?: Record<string, number>;
 }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const allowed = new Set(allowedHrefs);
   const groups = navGroups
     .map((group) => ({
@@ -50,7 +50,7 @@ export function NavList({
               const children = item.children ?? [];
               const childActive = children.some((child) => isActivePath(pathname, child.href));
               const active = isActivePath(pathname, item.href) || childActive;
-              const open = children.length === 0 || !collapsed[item.href];
+              const open = children.length > 0 && expanded[item.href] === true;
               const Icon = item.icon;
               return (
                 <li key={item.href}>
@@ -59,7 +59,7 @@ export function NavList({
                       type="button"
                       aria-expanded={open}
                       onClick={() =>
-                        setCollapsed((current) => ({ ...current, [item.href]: !current[item.href] }))
+                        setExpanded((current) => ({ ...current, [item.href]: !current[item.href] }))
                       }
                       className={navClass(active, showLabels)}
                     >

@@ -45,7 +45,7 @@ export async function searchWorkshopAction(raw: string): Promise<SearchHit[]> {
           id: customer.id,
           title: customer.name,
           note: customer.phone || "Tanpa telepon",
-          href: `/pelanggan?pelanggan=${encodeURIComponent(customer.id)}`,
+          href: `/pelanggan/data?id=${encodeURIComponent(customer.id)}`,
         })),
     );
     hits.push(
@@ -57,7 +57,7 @@ export async function searchWorkshopAction(raw: string): Promise<SearchHit[]> {
           id: vehicle.id,
           title: vehicle.plate,
           note: `${names.get(vehicle.customerId) ?? "Pelanggan"} · ${vehicle.brand} ${vehicle.bikeType}`,
-          href: `/pelanggan?pelanggan=${encodeURIComponent(vehicle.customerId)}`,
+          href: `/pelanggan/motor?id=${encodeURIComponent(vehicle.id)}`,
         })),
     );
   }

@@ -1,8 +1,21 @@
-import type { Metadata } from "next";
-import { ModulePage } from "@/components/ui/module-page";
+import { ProcurementPanel } from "@/components/workshop/procurement-panel";
+import { PageHeader } from "@/components/ui/page-header";
+import { guard } from "@/lib/auth/guard";
+import { listProcurements } from "@/lib/data/records";
 
-export const metadata: Metadata = { title: "Pengadaan" };
+export const metadata = { title: "Pengadaan barang" };
 
-export default function PengadaanPage() {
-  return <ModulePage href="/pengadaan" />;
+export default async function PengadaanPage() {
+  const { canWrite } = await guard("/pengadaan");
+  const records = await listProcurements();
+  return (
+    <div>
+      <PageHeader
+        title="Pengadaan barang"
+        description="Perlengkapan di luar stok jual, seperti kertas struk dan lakban."
+        href="/pengadaan"
+      />
+      <ProcurementPanel records={records} canWrite={canWrite} />
+    </div>
+  );
 }

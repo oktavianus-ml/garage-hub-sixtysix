@@ -66,6 +66,22 @@ export type Purchase = {
   createdAt: string;
   orderedAt: string | null;
 };
+export type ProcurementLine = {
+  name: string;
+  unit: string;
+  qty: number;
+  cost: number;
+};
+export type Procurement = {
+  id: string;
+  no: string;
+  vendor: string;
+  note: string;
+  boughtOn: string;
+  lines: ProcurementLine[];
+  total: number;
+  createdAt: string;
+};
 export type StaffUser = {
   id: string;
   name: string;
@@ -165,7 +181,7 @@ async function ensureOpen(tx: Transaction, month: string) {
   }
 }
 
-async function takeNumber(tx: Transaction, prefix: "SPK" | "KSR" | "PB") {
+async function takeNumber(tx: Transaction, prefix: "SPK" | "KSR" | "PB" | "PG") {
   const ref = store().doc("meta/sequences");
   const snap = await tx.get(ref);
   const next = num(snap.data()?.[prefix]) + 1;
@@ -855,6 +871,140 @@ export async function receivePurchase(
         ),
         ...stockLogs,
       ],
+    });
+  });
+}
+
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+function isCalendarDay(value: string) {
+  if (!DAY.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function mapProcurementLines(value: unknown): ProcurementLine[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    const name = text(row.name);
+    if (!name) return [];
+    return [
+      {
+        name,
+        unit: text(row.unit, "pcs"),
+        qty: num(row.qty),
+        cost: num(row.cost),
+      },
+    ];
+  });
+}
+
+function mapProcurement(id: string, data: FirebaseFirestore.DocumentData): Procurement {
+  const lines = mapProcurementLines(data.lines);
+  return {
+    id,
+    no: text(data.no),
+    vendor: text(data.vendor),
+    note: text(data.note),
+    boughtOn: text(data.boughtOn),
+    lines,
+    total: lines.reduce((sum, line) => sum + line.qty * line.cost, 0),
+    createdAt: text(data.createdAt),
+  };
+}
+
+function procurementFields(record: {
+  vendor: string;
+  boughtOn: string;
+  lines: ProcurementLine[];
+  total: number;
+  note: string;
+}) {
+  return {
+    Toko: record.vendor,
+    Tanggal: record.boughtOn,
+    Barang: record.lines.map((line) => `${line.name} ×${line.qty} ${line.unit}`).join(", "),
+    Total: rupiah(record.total),
+    Catatan: record.note,
+  };
+}
+
+function cleanProcurementLines(lines: ProcurementLine[]) {
+  if (lines.length === 0 || lines.length > 40) throw new Error("Tambah barang yang dibeli.");
+  return lines.map((line) => {
+    const name = line.name.trim();
+    const unit = line.unit.trim() || "pcs";
+    if (name.length < 2 || name.length > 80) throw new Error("Isi nama barang.");
+    if (unit.length > 20) throw new Error("Satuan terlalu panjang.");
+    if (!Number.isInteger(line.qty) || line.qty <= 0 || line.qty > 100000) {
+      throw new Error("Jumlah barang harus lebih dari nol.");
+    }
+    if (!Number.isInteger(line.cost) || line.cost < 0 || line.cost > 1_000_000_000) {
+      throw new Error("Harga beli tidak valid.");
+    }
+    return { name, unit, qty: line.qty, cost: line.cost };
+  });
+}
+
+export async function listProcurements() {
+  const snap = await store().collection("procurements").get();
+  return snap.docs
+    .map((doc) => mapProcurement(doc.id, doc.data()))
+    .sort((a, b) => b.boughtOn.localeCompare(a.boughtOn) || b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function saveProcurement(
+  input: {
+    id?: string;
+    vendor: string;
+    note: string;
+    boughtOn: string;
+    lines: ProcurementLine[];
+  },
+  actor: ActivityActor,
+) {
+  const vendor = input.vendor.trim();
+  const note = input.note.trim();
+  if (vendor.length < 2 || vendor.length > 80) throw new Error("Isi nama toko.");
+  if (note.length > 200) throw new Error("Catatan terlalu panjang.");
+  if (!isCalendarDay(input.boughtOn) || input.boughtOn > jakartaDate()) {
+    throw new Error("Tanggal beli tidak valid.");
+  }
+  const lines = cleanProcurementLines(input.lines);
+  const database = store();
+  await database.runTransaction(async (tx) => {
+    const ref = input.id
+      ? database.collection("procurements").doc(input.id)
+      : database.collection("procurements").doc();
+    const existingSnap = input.id ? await tx.get(ref) : null;
+    const existing = existingSnap?.exists ? mapProcurement(existingSnap.id, existingSnap.data() ?? {}) : null;
+    if (input.id && !existing) throw new Error("Pengadaan tidak ditemukan.");
+    await ensureOpen(tx, monthKeyOf(input.boughtOn));
+    if (existing && monthKeyOf(existing.boughtOn) !== monthKeyOf(input.boughtOn)) {
+      await ensureOpen(tx, monthKeyOf(existing.boughtOn));
+    }
+    const no = existing?.no || (await takeNumber(tx, "PG"));
+    const total = lines.reduce((sum, line) => sum + line.qty * line.cost, 0);
+    const next = { vendor, boughtOn: input.boughtOn, lines, total, note };
+    tx.set(ref, {
+      no,
+      vendor,
+      note,
+      boughtOn: input.boughtOn,
+      lines,
+      total,
+      createdAt: existing?.createdAt || new Date().toISOString(),
+    });
+    queueActivity(tx, {
+      actor,
+      action: existing ? "ubah" : "buat",
+      entity: "pengadaan",
+      entityId: ref.id,
+      label: existing ? `${no} diubah` : `${no} dibeli di ${vendor}`,
+      changes: fieldChanges(existing ? procurementFields(existing) : {}, procurementFields(next)),
     });
   });
 }

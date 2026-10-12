@@ -24,6 +24,7 @@ const byRole: Record<Role, Record<string, Access>> = {
     "/inventori": "read",
     "/distributor": "read",
     "/pembelian": "read",
+    "/pengadaan": "read",
     "/kas": "read",
     "/bagi-hasil": "read",
   },
@@ -35,6 +36,7 @@ const byRole: Record<Role, Record<string, Access>> = {
     "/produk": "read",
     "/inventori": "read",
     "/kas": "write",
+    "/pengadaan": "write",
   },
   gudang: {
     "/": "read",
@@ -42,6 +44,7 @@ const byRole: Record<Role, Record<string, Access>> = {
     "/inventori": "write",
     "/distributor": "write",
     "/pembelian": "write",
+    "/pengadaan": "write",
   },
   mekanik: {
     "/": "read",
@@ -52,8 +55,14 @@ const byRole: Record<Role, Record<string, Access>> = {
   },
 };
 
+function accessKey(href: string) {
+  if (href === "/pembelian" || href.startsWith("/pembelian/")) return "/pembelian";
+  if (href === "/pelanggan" || href.startsWith("/pelanggan/")) return "/pelanggan";
+  return href;
+}
+
 export function accessFor(role: Role, href: string): Access {
-  const key = href === "/pembelian" || href.startsWith("/pembelian/") ? "/pembelian" : href;
+  const key = accessKey(href);
   if (role === "pemilik") return "write";
   return byRole[role][key] ?? shared[key] ?? "none";
 }
@@ -64,6 +73,9 @@ export function allowedHrefs(role: Role) {
     "/service",
     "/kasir",
     "/pelanggan",
+    "/pelanggan/daftar",
+    "/pelanggan/data",
+    "/pelanggan/motor",
     "/produk",
     "/inventori",
     "/distributor",

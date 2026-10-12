@@ -1,4 +1,5 @@
 import {
+  Bike,
   BookOpen,
   BadgeCheck,
   ClipboardList,
@@ -7,6 +8,7 @@ import {
   HardHat,
   History,
   LayoutDashboard,
+  List,
   Package,
   PackageCheck,
   PieChart,
@@ -15,6 +17,7 @@ import {
   Settings,
   ShoppingBag,
   Truck,
+  UserPlus,
   Wallet,
   Users,
   Warehouse,
@@ -67,7 +70,27 @@ export const navGroups: NavGroup[] = [
         label: "Pelanggan",
         href: "/pelanggan",
         icon: Users,
-        description: "Data pelanggan dan motor yang dipakai tiap servis.",
+        description: "Daftar pelanggan, data nama, dan motor yang dipakai tiap servis.",
+        children: [
+          {
+            label: "Daftar",
+            href: "/pelanggan/daftar",
+            icon: List,
+            description: "Nama, telepon, dan motor yang sudah tercatat.",
+          },
+          {
+            label: "Data",
+            href: "/pelanggan/data",
+            icon: UserPlus,
+            description: "Tambah atau ubah nama dan telepon pelanggan.",
+          },
+          {
+            label: "Motor",
+            href: "/pelanggan/motor",
+            icon: Bike,
+            description: "Catat plat, merk, tipe, dan tahun motor pelanggan.",
+          },
+        ],
       },
     ],
   },
@@ -119,7 +142,7 @@ export const navGroups: NavGroup[] = [
         ],
       },
       {
-        label: "Pengadaan",
+        label: "Pengadaan barang",
         href: "/pengadaan",
         icon: ScrollText,
         description:

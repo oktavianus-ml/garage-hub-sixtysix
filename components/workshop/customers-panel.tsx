@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
+import Link from "next/link";
 import { Bike, List, Pencil, Search, UserPlus } from "lucide-react";
 import { saveCustomerAction, saveVehicleAction } from "@/lib/data/actions";
 import { OTHER_BIKE, bikeBrands, bikeTypes, yearsForBike } from "@/lib/data/bikes";
@@ -20,6 +21,7 @@ const bikeFilters = [
 ] as const;
 
 type BikeFilter = (typeof bikeFilters)[number]["id"];
+type CustomerView = "daftar" | "data" | "motor";
 
 function RecordMark({ kind }: { kind: "baru" | "revisi" }) {
   const revisi = kind === "revisi";
@@ -74,35 +76,124 @@ function matchesQuery(customer: Customer, bikes: Vehicle[], query: string) {
 }
 
 export function CustomersPanel({
+  view,
   customers,
   vehicles,
   canWrite,
-  selectedCustomerId = "",
+  customerId = "",
+  vehicleId = "",
 }: {
+  view: CustomerView;
   customers: Customer[];
   vehicles: Vehicle[];
   canWrite: boolean;
-  selectedCustomerId?: string;
+  customerId?: string;
+  vehicleId?: string;
 }) {
-  const [customerState, customerAction, customerPending] = useActionState(saveCustomerAction, null);
-  const [vehicleState, vehicleAction, vehiclePending] = useActionState(saveVehicleAction, null);
-  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [customerId, setCustomerId] = useState(selectedCustomerId);
-  const [plate, setPlate] = useState("");
-  const [brandChoice, setBrandChoice] = useState("");
-  const [typeChoice, setTypeChoice] = useState("");
-  const [yearChoice, setYearChoice] = useState("");
-  const [customBrand, setCustomBrand] = useState("");
-  const [customType, setCustomType] = useState("");
-  const customerCardRef = useRef<HTMLDivElement>(null);
-  const vehicleCardRef = useRef<HTMLDivElement>(null);
-  const customerSnapshot = customers.map((customer) => `${customer.id}:${customer.name}:${customer.phone}`).join("|");
-  const vehicleSnapshot = vehicles
-    .map((vehicle) => `${vehicle.id}:${vehicle.plate}:${vehicle.brand}:${vehicle.bikeType}:${vehicle.year}`)
-    .join("|");
+  const customer = customers.find((item) => item.id === customerId) ?? null;
+  const vehicle = vehicles.find((item) => item.id === vehicleId) ?? null;
+
+  if (view === "data") {
+    return <CustomerForm key={customer?.id ?? "baru"} customer={customer} canWrite={canWrite} />;
+  }
+  if (view === "motor") {
+    return (
+      <VehicleForm
+        key={vehicle?.id ?? `baru-${customerId}`}
+        customers={customers}
+        vehicle={vehicle}
+        selectedCustomerId={customerId}
+        canWrite={canWrite}
+      />
+    );
+  }
+  return <CustomerDirectory customers={customers} vehicles={vehicles} canWrite={canWrite} />;
+}
+
+function CustomerForm({ customer, canWrite }: { customer: Customer | null; canWrite: boolean }) {
+  const [state, action, pending] = useActionState(saveCustomerAction, null);
+  const [name, setName] = useState(customer?.name ?? "");
+  const [phone, setPhone] = useState(customer?.phone ?? "");
+
+  return (
+    <div className="mt-5 max-w-xl">
+      <GlassCard accent={!customer} className={cn("p-4", customer && "border-t-2 border-t-teal")}>
+        <div className="flex items-start justify-between gap-3">
+          <SectionTitle icon={customer ? Pencil : UserPlus} tone={customer ? "teal" : "amber"}>
+            {customer ? "Ubah pelanggan" : "Pelanggan baru"}
+          </SectionTitle>
+          <RecordMark kind={customer ? "revisi" : "baru"} />
+        </div>
+        {canWrite ? (
+          <form action={action} className="mt-3 flex flex-col gap-3">
+            {customer ? <input type="hidden" name="id" value={customer.id} /> : null}
+            <input
+              name="name"
+              required
+              placeholder="Nama"
+              className={inputClass}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <input
+              name="phone"
+              placeholder="Telepon"
+              className={inputClass}
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+            />
+            {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+            <p className="text-sm leading-6 text-muted">
+              {customer
+                ? "Perubahan menimpa nama dan telepon pelanggan ini."
+                : "Setelah disimpan, lanjut isi motor pelanggan ini."}
+            </p>
+            <div className="flex gap-2">
+              {customer ? (
+                <Link
+                  href="/pelanggan/data"
+                  className="inline-flex h-11 items-center rounded-xl border border-line bg-chip px-4 text-sm font-semibold"
+                >
+                  Batal
+                </Link>
+              ) : null}
+              <SaveButton pending={pending} className="flex-1">
+                {customer ? "Simpan perubahan" : "Simpan pelanggan"}
+              </SaveButton>
+            </div>
+          </form>
+        ) : (
+          <p className="mt-3 text-sm leading-6 text-muted">
+            {customer
+              ? `${customer.name}. ${customer.phone || "Tanpa telepon"}. Akun ini hanya bisa melihat.`
+              : "Akun ini hanya bisa melihat. Daftar nama ada di menu Daftar."}
+          </p>
+        )}
+      </GlassCard>
+    </div>
+  );
+}
+
+function VehicleForm({
+  customers,
+  vehicle,
+  selectedCustomerId,
+  canWrite,
+}: {
+  customers: Customer[];
+  vehicle: Vehicle | null;
+  selectedCustomerId: string;
+  canWrite: boolean;
+}) {
+  const choices = vehicle ? vehicleChoices(vehicle) : null;
+  const [state, action, pending] = useActionState(saveVehicleAction, null);
+  const [customerId, setCustomerId] = useState(vehicle?.customerId || selectedCustomerId);
+  const [plate, setPlate] = useState(vehicle?.plate ?? "");
+  const [brandChoice, setBrandChoice] = useState(choices?.brandChoice ?? "");
+  const [typeChoice, setTypeChoice] = useState(choices?.typeChoice ?? "");
+  const [yearChoice, setYearChoice] = useState(vehicle ? String(vehicle.year) : "");
+  const [customBrand, setCustomBrand] = useState(choices?.customBrand ?? "");
+  const [customType, setCustomType] = useState(choices?.customType ?? "");
   const brandIsOther = brandChoice === OTHER_BIKE;
   const typeIsOther = typeChoice === OTHER_BIKE;
   const types = brandChoice && !brandIsOther ? bikeTypes(brandChoice) : [];
@@ -115,133 +206,26 @@ export function CustomersPanel({
         : [];
   const yearList =
     yearChoice && !years.includes(Number(yearChoice)) ? [Number(yearChoice), ...years] : years;
-
-  function beginCustomerEdit(customer: Customer) {
-    setEditingCustomer(customer);
-    setCustomerName(customer.name);
-    setCustomerPhone(customer.phone);
-    customerCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-
-  function cancelCustomerEdit() {
-    setEditingCustomer(null);
-    setCustomerName("");
-    setCustomerPhone("");
-  }
-
-  function beginVehicleEdit(vehicle: Vehicle) {
-    const choices = vehicleChoices(vehicle);
-    setEditingVehicle(vehicle);
-    setCustomerId(vehicle.customerId);
-    setPlate(vehicle.plate);
-    setBrandChoice(choices.brandChoice);
-    setTypeChoice(choices.typeChoice);
-    setYearChoice(String(vehicle.year));
-    setCustomBrand(choices.customBrand);
-    setCustomType(choices.customType);
-    vehicleCardRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-
-  useEffect(() => {
-    setEditingCustomer(null);
-    setCustomerName("");
-    setCustomerPhone("");
-    setEditingVehicle(null);
-    setCustomerId(selectedCustomerId);
-    setPlate("");
-    setBrandChoice("");
-    setTypeChoice("");
-    setYearChoice("");
-    setCustomBrand("");
-    setCustomType("");
-  }, [customerSnapshot, selectedCustomerId, vehicleSnapshot]);
-
-  function cancelVehicleEdit() {
-    setEditingVehicle(null);
-    setCustomerId(selectedCustomerId);
-    setPlate("");
-    setBrandChoice("");
-    setTypeChoice("");
-    setYearChoice("");
-    setCustomBrand("");
-    setCustomType("");
-  }
+  const owner = customers.find((customer) => customer.id === (vehicle?.customerId || customerId));
 
   return (
-    <div className="mt-5 grid items-stretch gap-4 lg:grid-cols-2">
-      {canWrite ? (
-        <div ref={customerCardRef} className="h-full">
-          <GlassCard
-            accent={!editingCustomer}
-            className={cn("flex h-full flex-col p-4", editingCustomer && "border-t-2 border-t-teal")}
-          >
-          <div className="flex items-start justify-between gap-3">
-            <SectionTitle icon={editingCustomer ? Pencil : UserPlus} tone={editingCustomer ? "teal" : "amber"}>
-              {editingCustomer ? "Ubah pelanggan" : "Pelanggan baru"}
-            </SectionTitle>
-            <RecordMark kind={editingCustomer ? "revisi" : "baru"} />
-          </div>
-          <form action={customerAction} className="mt-3 flex flex-1 flex-col gap-3">
-            {editingCustomer ? <input type="hidden" name="id" value={editingCustomer.id} /> : null}
-            <input
-              name="name"
-              required
-              placeholder="Nama"
-              className={inputClass}
-              value={customerName}
-              onChange={(event) => setCustomerName(event.target.value)}
-            />
-            <input
-              name="phone"
-              placeholder="Telepon"
-              className={inputClass}
-              value={customerPhone}
-              onChange={(event) => setCustomerPhone(event.target.value)}
-            />
-            {customerState?.message ? <p className="text-sm text-danger">{customerState.message}</p> : null}
-            <p className="mt-auto text-sm leading-6 text-muted">
-              {editingCustomer
-                ? "Perubahan menimpa nama dan telepon pelanggan ini."
-                : "Simpan dulu. Nama ini langsung terpilih di kartu motor."}
-            </p>
-            <div className="flex gap-2">
-              {editingCustomer ? (
-                <button
-                  type="button"
-                  className="h-11 rounded-xl border border-line bg-chip px-4 text-sm font-semibold"
-                  onClick={cancelCustomerEdit}
-                >
-                  Batal
-                </button>
-              ) : null}
-              <SaveButton pending={customerPending} className="flex-1">
-                {editingCustomer ? "Simpan perubahan" : "Simpan pelanggan"}
-              </SaveButton>
-            </div>
-          </form>
-          </GlassCard>
+    <div className="mt-5 max-w-xl">
+      <GlassCard accent={!vehicle} className={cn("p-4", vehicle && "border-t-2 border-t-teal")}>
+        <div className="flex items-start justify-between gap-3">
+          <SectionTitle icon={vehicle ? Pencil : Bike} tone={vehicle ? "teal" : "amber"}>
+            {vehicle ? "Ubah motor" : "Motor pelanggan"}
+          </SectionTitle>
+          <RecordMark kind={vehicle ? "revisi" : "baru"} />
         </div>
-      ) : null}
-      {canWrite ? (
-        <div ref={vehicleCardRef} className="h-full">
-          <GlassCard
-            accent={!editingVehicle}
-            className={cn("flex h-full flex-col p-4", editingVehicle && "border-t-2 border-t-teal")}
-          >
-          <div className="flex items-start justify-between gap-3">
-            <SectionTitle icon={editingVehicle ? Pencil : Bike} tone={editingVehicle ? "teal" : "amber"}>
-              {editingVehicle ? "Ubah motor" : "Motor pelanggan"}
-            </SectionTitle>
-            <RecordMark kind={editingVehicle ? "revisi" : "baru"} />
-          </div>
-          <form action={vehicleAction} className="mt-3 flex flex-1 flex-col gap-3">
-            {editingVehicle ? <input type="hidden" name="id" value={editingVehicle.id} /> : null}
-            {editingVehicle ? <input type="hidden" name="customerId" value={editingVehicle.customerId} /> : null}
+        {canWrite ? (
+          <form action={action} className="mt-3 flex flex-col gap-3">
+            {vehicle ? <input type="hidden" name="id" value={vehicle.id} /> : null}
+            {vehicle ? <input type="hidden" name="customerId" value={vehicle.customerId} /> : null}
             <select
-              name={editingVehicle ? undefined : "customerId"}
-              required={!editingVehicle}
-              disabled={Boolean(editingVehicle)}
-              className={cn(inputClass, editingVehicle && "opacity-70")}
+              name={vehicle ? undefined : "customerId"}
+              required={!vehicle}
+              disabled={Boolean(vehicle)}
+              className={cn(inputClass, vehicle && "opacity-70")}
               value={customerId}
               onChange={(event) => setCustomerId(event.target.value)}
             >
@@ -345,39 +329,36 @@ export function CustomersPanel({
                 </option>
               ))}
             </select>
-            {vehicleState?.message ? <p className="text-sm text-danger">{vehicleState.message}</p> : null}
-            {editingVehicle ? (
-              <p className="mt-auto text-sm leading-6 text-muted">
-                Hanya motor ini yang berubah. Motor lain tetap seperti semula.
-              </p>
-            ) : null}
-            <div className={cn("flex gap-2", !editingVehicle && "mt-auto")}>
-              {editingVehicle ? (
-                <button
-                  type="button"
-                  className="h-11 rounded-xl border border-line bg-chip px-4 text-sm font-semibold"
-                  onClick={cancelVehicleEdit}
+            {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+            <p className="text-sm leading-6 text-muted">
+              {vehicle
+                ? "Hanya motor ini yang berubah. Motor lain tetap seperti semula."
+                : customers.length === 0
+                  ? "Simpan data pelanggan dulu, baru motornya bisa dicatat."
+                  : "Plat, merk, tipe, dan tahun menempel ke pelanggan yang dipilih."}
+            </p>
+            <div className="flex gap-2">
+              {vehicle ? (
+                <Link
+                  href="/pelanggan/motor"
+                  className="inline-flex h-11 items-center rounded-xl border border-line bg-chip px-4 text-sm font-semibold"
                 >
                   Batal
-                </button>
+                </Link>
               ) : null}
-              <SaveButton pending={vehiclePending} disabled={customers.length === 0} className="flex-1">
-                {editingVehicle ? "Simpan perubahan" : "Simpan motor"}
+              <SaveButton pending={pending} disabled={customers.length === 0} className="flex-1">
+                {vehicle ? "Simpan perubahan" : "Simpan motor"}
               </SaveButton>
             </div>
           </form>
-          </GlassCard>
-        </div>
-      ) : null}
-      <CustomerDirectory
-        customers={customers}
-        vehicles={vehicles}
-        canWrite={canWrite}
-        editingCustomerId={editingCustomer?.id ?? ""}
-        editingVehicleId={editingVehicle?.id ?? ""}
-        onEditCustomer={beginCustomerEdit}
-        onEditVehicle={beginVehicleEdit}
-      />
+        ) : (
+          <p className="mt-3 text-sm leading-6 text-muted">
+            {vehicle
+              ? `${vehicle.plate} · ${vehicle.brand} ${vehicle.bikeType} · ${vehicle.year}. ${owner?.name ?? "Pelanggan"}. Akun ini hanya bisa melihat.`
+              : "Akun ini hanya bisa melihat. Motor yang sudah tercatat ada di menu Daftar."}
+          </p>
+        )}
+      </GlassCard>
     </div>
   );
 }
@@ -386,18 +367,10 @@ function CustomerDirectory({
   customers,
   vehicles,
   canWrite,
-  editingCustomerId,
-  editingVehicleId,
-  onEditCustomer,
-  onEditVehicle,
 }: {
   customers: Customer[];
   vehicles: Vehicle[];
   canWrite: boolean;
-  editingCustomerId: string;
-  editingVehicleId: string;
-  onEditCustomer: (customer: Customer) => void;
-  onEditVehicle: (vehicle: Vehicle) => void;
 }) {
   const [query, setQuery] = useState("");
   const [bikeFilter, setBikeFilter] = useState<BikeFilter>("semua");
@@ -429,7 +402,7 @@ function CustomerDirectory({
   const rangeEnd = start + visible.length;
 
   return (
-    <GlassCard className="p-4 lg:col-span-2">
+    <GlassCard className="mt-5 p-4">
       <div className="flex items-center justify-between gap-3">
         <SectionTitle icon={List} tone="teal">
           Daftar
@@ -486,22 +459,14 @@ function CustomerDirectory({
             <ul className="mt-2 divide-y divide-line">
               {visible.map((customer) => {
                 const bikes = bikesByCustomer.get(customer.id) ?? [];
-                const editingThis = editingCustomerId === customer.id;
                 return (
-                  <li
-                    key={customer.id}
-                    className={cn("py-3", editingThis && "-mx-2 rounded-xl bg-teal-soft px-2")}
-                  >
+                  <li key={customer.id} className="py-3">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                       <p className="font-medium">{customer.name}</p>
                       {canWrite ? (
-                        <button
-                          type="button"
-                          className="text-xs font-semibold text-teal"
-                          onClick={() => onEditCustomer(customer)}
-                        >
+                        <Link href={`/pelanggan/data?id=${encodeURIComponent(customer.id)}`} className="text-xs font-semibold text-teal">
                           Ubah
-                        </button>
+                        </Link>
                       ) : null}
                     </div>
                     <p className="text-xs text-muted">{customer.phone || "Tanpa telepon"}</p>
@@ -510,25 +475,18 @@ function CustomerDirectory({
                     ) : (
                       <ul className="mt-2 flex flex-col gap-1">
                         {bikes.map((bike) => (
-                          <li
-                            key={bike.id}
-                            className={cn(
-                              "flex flex-wrap items-center gap-1.5 rounded-lg py-0.5 text-sm",
-                              editingVehicleId === bike.id && "bg-teal-soft px-2 ring-1 ring-teal/30",
-                            )}
-                          >
+                          <li key={bike.id} className="flex flex-wrap items-center gap-1.5 rounded-lg py-0.5 text-sm">
                             <span>
                               {bike.plate} · {bike.brand} {bike.bikeType} · {bike.year}
                             </span>
                             {canWrite ? (
-                              <button
-                                type="button"
+                              <Link
+                                href={`/pelanggan/motor?id=${encodeURIComponent(bike.id)}`}
                                 aria-label={`Ubah motor ${bike.plate}`}
                                 className="inline-flex size-7 items-center justify-center rounded-lg text-teal"
-                                onClick={() => onEditVehicle(bike)}
                               >
                                 <Pencil className="size-3.5" aria-hidden />
-                              </button>
+                              </Link>
                             ) : null}
                           </li>
                         ))}

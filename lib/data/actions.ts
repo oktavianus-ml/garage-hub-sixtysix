@@ -14,6 +14,7 @@ import {
   saveProduct,
   saveProfitSplit,
   savePurchase,
+  saveProcurement,
   placePurchase,
   receivePurchase,
   cancelPurchase,
@@ -57,7 +58,8 @@ export async function saveCustomerAction(_prev: FormState, formData: FormData): 
   } catch (error) {
     return fail(error);
   }
-  redirect(`/pelanggan?pelanggan=${encodeURIComponent(id)}`);
+  if (String(formData.get("id") ?? "")) redirect("/pelanggan/daftar");
+  redirect(`/pelanggan/motor?pelanggan=${encodeURIComponent(id)}`);
 }
 
 export async function saveVehicleAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -88,7 +90,7 @@ export async function saveVehicleAction(_prev: FormState, formData: FormData): P
   } catch (error) {
     return fail(error);
   }
-  redirect("/pelanggan");
+  redirect("/pelanggan/daftar");
 }
 
 export async function saveProductAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -203,6 +205,64 @@ function readReceiveLines(raw: FormDataEntryValue | null) {
   }
   if (lines.length === 0) return { message: "Isi jumlah barang yang datang." } satisfies FormState;
   return lines;
+}
+
+function readProcurementLines(raw: FormDataEntryValue | null) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(String(raw ?? "[]"));
+  } catch {
+    return { message: "Daftar barang tidak valid." } satisfies FormState;
+  }
+  if (!Array.isArray(parsed)) return { message: "Daftar barang tidak valid." } satisfies FormState;
+  const lines: { name: string; unit: string; qty: number; cost: number }[] = [];
+  for (const item of parsed) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const name = typeof row.name === "string" ? row.name.trim() : "";
+    const unit = typeof row.unit === "string" ? row.unit.trim() : "";
+    const qty = wholeNumber(row.qty);
+    const cost = wholeNumber(row.cost);
+    if (!name && (qty === null || qty === 0) && (cost === null || cost === 0)) continue;
+    if (name.length < 2 || name.length > 80) return { message: "Isi nama barang." } satisfies FormState;
+    if (unit.length > 20) return { message: "Satuan terlalu panjang." } satisfies FormState;
+    if (qty === null || qty <= 0 || qty > 100000) {
+      return { message: "Jumlah barang harus lebih dari nol." } satisfies FormState;
+    }
+    if (cost === null || cost < 0 || cost > 1_000_000_000) {
+      return { message: "Harga beli tidak valid." } satisfies FormState;
+    }
+    lines.push({ name, unit: unit || "pcs", qty, cost });
+  }
+  if (lines.length === 0 || lines.length > 40) return { message: "Tambah barang yang dibeli." } satisfies FormState;
+  return lines;
+}
+
+export async function saveProcurementAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const access = await guard("/pengadaan");
+  if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const vendor = String(formData.get("vendor") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+  const boughtOn = String(formData.get("boughtOn") ?? "");
+  if (vendor.length < 2 || vendor.length > 80) return { message: "Isi nama toko." };
+  if (note.length > 200) return { message: "Catatan terlalu panjang." };
+  const lines = readProcurementLines(formData.get("lines"));
+  if (!Array.isArray(lines)) return lines;
+  try {
+    await saveProcurement(
+      {
+        id: String(formData.get("id") ?? "") || undefined,
+        vendor,
+        note,
+        boughtOn,
+        lines,
+      },
+      access.user,
+    );
+  } catch (error) {
+    return fail(error);
+  }
+  redirect("/pengadaan");
 }
 
 export async function savePurchaseAction(_prev: FormState, formData: FormData): Promise<FormState> {
