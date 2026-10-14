@@ -20,6 +20,7 @@ export const ACTIVITY_ENTITIES = [
   "akun",
   "tutup-bulan",
   "pengaturan",
+  "akses",
 ] as const;
 
 export type ActivityEntity = (typeof ACTIVITY_ENTITIES)[number];
@@ -42,6 +43,7 @@ export const activityEntityLabel: Record<ActivityEntity, string> = {
   akun: "Akun (COA)",
   "tutup-bulan": "Tutup bulan",
   pengaturan: "Pengaturan",
+  akses: "Akses menu",
 };
 
 export const activityActionLabel: Record<ActivityAction, string> = {

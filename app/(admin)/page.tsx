@@ -8,5 +8,5 @@ export const metadata = { title: "Dashboard" };
 export default async function DashboardPage() {
   const { user } = await guard("/");
   const board = await todayBoard();
-  return <DashboardHome {...board} canSeeSplit={accessFor(user.role, "/bagi-hasil") !== "none"} />;
+  return <DashboardHome {...board} canSeeSplit={(await accessFor(user.role, "/bagi-hasil", user.uid)) !== "none"} />;
 }

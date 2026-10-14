@@ -548,6 +548,7 @@ function PurchaseDirectory({
                                 {canCancel ? (
                                   <form action={cancelAction}>
                                     <input type="hidden" name="id" value={purchase.id} />
+                                    <input type="hidden" name="stage" value={stage} />
                                     <button type="submit" disabled={cancelPending} className={cancelButton}>
                                       Batalkan
                                     </button>
@@ -814,6 +815,7 @@ function PurchaseDirectory({
                         purchase.lines.every((line) => line.received === 0) ? (
                           <form action={cancelAction}>
                             <input type="hidden" name="id" value={purchase.id} />
+                            <input type="hidden" name="stage" value={stage} />
                             <button
                               type="submit"
                               disabled={cancelPending}

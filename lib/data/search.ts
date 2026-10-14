@@ -30,8 +30,8 @@ export async function searchWorkshopAction(raw: string): Promise<SearchHit[]> {
 
   const needle = query.toLowerCase();
   const plateNeedle = fold(query);
-  const canCustomer = accessFor(user.role, "/pelanggan") !== "none";
-  const canService = accessFor(user.role, "/service") !== "none" && !isNavHidden("/service");
+  const canCustomer = (await accessFor(user.role, "/pelanggan", user.uid)) !== "none";
+  const canService = (await accessFor(user.role, "/service", user.uid)) !== "none" && !isNavHidden("/service");
   const hits: SearchHit[] = [];
 
   if (canCustomer) {

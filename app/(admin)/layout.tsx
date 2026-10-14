@@ -13,14 +13,19 @@ export default async function AdminLayout({
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/api/session");
+  const [purchaseLevel, procurementLevel, hrefs] = await Promise.all([
+    accessFor(user.role, "/pembelian", user.uid),
+    accessFor(user.role, "/pengadaan", user.uid),
+    allowedHrefs(user.role, user.uid),
+  ]);
   const [purchaseCounts, procurementCounts] = await Promise.all([
-    accessFor(user.role, "/pembelian") === "none" ? Promise.resolve({}) : purchaseQueueCounts(),
-    accessFor(user.role, "/pengadaan") === "none" ? Promise.resolve({}) : procurementQueueCounts(),
+    purchaseLevel === "none" ? Promise.resolve({}) : purchaseQueueCounts(),
+    procurementLevel === "none" ? Promise.resolve({}) : procurementQueueCounts(),
   ]);
   const counts = { ...purchaseCounts, ...procurementCounts };
 
   return (
-    <AdminShell user={user} allowedHrefs={allowedHrefs(user.role)} counts={counts}>
+    <AdminShell user={user} allowedHrefs={hrefs} counts={counts}>
       {children}
     </AdminShell>
   );

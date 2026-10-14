@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { guard } from "@/lib/auth/guard";
+import { isConfigurableRole, sanitizeHrefs } from "@/lib/auth/menus";
 import { isRole } from "@/lib/auth/roles";
+import { clearUserMenus, menuAccessTarget, saveRoleMenus, saveUserMenus } from "@/lib/data/menu-access";
 import { bikeSelectionError } from "@/lib/data/bikes";
 import { accountCodeError, isAccountKind } from "@/lib/data/account-types";
 import { saveChartAccount, seedChartAccounts } from "@/lib/data/accounts";
@@ -373,7 +375,7 @@ export async function receiveProcurementAction(_prev: FormState, formData: FormD
 }
 
 export async function cancelProcurementAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const access = await guard("/pengadaan");
+  const access = await guard(procurementPath(formData));
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "");
   if (!id) return { message: "Pilih pengadaan." };
@@ -386,7 +388,7 @@ export async function cancelProcurementAction(_prev: FormState, formData: FormDa
 }
 
 export async function savePurchaseAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const access = await guard("/pembelian");
+  const access = await guard("/pembelian/permintaan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const distributorId = String(formData.get("distributorId") ?? "");
   const note = String(formData.get("note") ?? "").trim();
@@ -411,7 +413,7 @@ export async function savePurchaseAction(_prev: FormState, formData: FormData): 
 }
 
 export async function placePurchaseAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const access = await guard("/pembelian");
+  const access = await guard("/pembelian/persetujuan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "");
   if (!id) return { message: "Pilih permintaan." };
@@ -424,7 +426,7 @@ export async function placePurchaseAction(_prev: FormState, formData: FormData):
 }
 
 export async function receivePurchaseAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const access = await guard("/pembelian");
+  const access = await guard("/pembelian/penerimaan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "");
   if (!id) return { message: "Pilih pesanan." };
@@ -440,7 +442,12 @@ export async function receivePurchaseAction(_prev: FormState, formData: FormData
 }
 
 export async function cancelPurchaseAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const access = await guard("/pembelian");
+  const stage = String(formData.get("stage") ?? "");
+  const href =
+    stage === "permintaan" || stage === "persetujuan" || stage === "penerimaan"
+      ? `/pembelian/${stage}`
+      : "/pembelian";
+  const access = await guard(href);
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "");
   if (!id) return { message: "Pilih pembelian." };
@@ -728,6 +735,54 @@ export async function saveWorkshopSettingsAction(
   }
   revalidatePath("/pengaturan");
   return { message: "Pengaturan tersimpan.", ok: true };
+}
+
+function readHrefs(raw: FormDataEntryValue | null) {
+  try {
+    const parsed = JSON.parse(String(raw ?? "[]"));
+    if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) return null;
+    return sanitizeHrefs(parsed);
+  } catch {
+    return null;
+  }
+}
+
+export async function saveMenuAccessAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const access = await guard("/akses-menu");
+  if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const intent = String(formData.get("intent") ?? "");
+  try {
+    if (intent === "role") {
+      const role = String(formData.get("role") ?? "");
+      if (!isConfigurableRole(role)) return { message: "Pilih peran." };
+      const hrefs = readHrefs(formData.get("hrefs"));
+      if (!hrefs) return { message: "Daftar menu tidak valid." };
+      const changed = await saveRoleMenus(role, hrefs, access.user);
+      if (!changed) return { message: "Tidak ada yang berubah.", ok: true };
+    } else if (intent === "user" || intent === "reset") {
+      const userId = String(formData.get("userId") ?? "").trim();
+      const person = await menuAccessTarget(userId);
+      if (!person) return { message: "Pegawai tidak ditemukan." };
+      if (person.role === "pemilik") return { message: "Pemilik selalu membuka semua menu." };
+      if (!isConfigurableRole(person.role)) return { message: "Peran pegawai tidak dikenal." };
+      if (intent === "reset") {
+        const changed = await clearUserMenus(userId, person.name, person.role, access.user);
+        if (!changed) return { message: "Orang ini sudah ikut peran.", ok: true };
+      } else {
+        const hrefs = readHrefs(formData.get("hrefs"));
+        if (!hrefs) return { message: "Daftar menu tidak valid." };
+        const changed = await saveUserMenus(userId, person.name, person.role, hrefs, access.user);
+        if (!changed) return { message: "Tidak ada yang berubah.", ok: true };
+      }
+    } else {
+      return { message: "Permintaan tidak valid." };
+    }
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/", "layout");
+  revalidatePath("/akses-menu");
+  return { message: intent === "reset" ? "Orang ini kembali ikut peran." : "Akses menu tersimpan.", ok: true };
 }
 
 export async function seedAccountsAction(_prev: FormState, _formData: FormData): Promise<FormState> {

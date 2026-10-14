@@ -9,7 +9,9 @@ import { getWorkshopSettings, workshopBrand } from "@/lib/data/settings";
 export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user) return NextResponse.redirect(new URL("/login", request.url));
-  if (accessFor(user.role, "/laporan") === "none") return NextResponse.redirect(new URL("/", request.url));
+  if ((await accessFor(user.role, "/laporan", user.uid)) === "none") {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
 
   const url = new URL(request.url);
   const period = resolvePeriod({
