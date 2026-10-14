@@ -1,4 +1,4 @@
-import { FileSpreadsheet, FileText, ShoppingBag, Wallet } from "lucide-react";
+import { FileSpreadsheet, FileText, PieChart, ShoppingBag, Wallet } from "lucide-react";
 import { ReportFilter } from "@/components/workshop/report-filter";
 import { buttonClass } from "@/components/ui/controls";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -84,6 +84,33 @@ export function SalesReportView({ report }: { report: SalesReport }) {
           </ul>
         </GlassCard>
       </div>
+
+      <GlassCard className="mt-4 p-4">
+        <SectionTitle icon={PieChart} tone="teal">
+          Pembagian keuntungan
+        </SectionTitle>
+        <p className="mt-3 text-sm leading-6 text-muted">
+          Dihitung dari laba kotor periode ini, mengikuti persentase bagi hasil. Pengeluaran kas belum dipotong.
+        </p>
+        {report.shares.length === 0 ? (
+          <p className="mt-3 text-sm text-muted">Persentase bagi hasil belum diatur.</p>
+        ) : (
+          <ul className="mt-2 divide-y divide-line">
+            {report.shares.map((share) => (
+              <li key={share.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                <p className="min-w-0">
+                  <span className="font-medium">{share.name}</span>
+                  {share.role ? <span className="ml-2 text-muted">{share.role}</span> : null}
+                  <span className="ml-2 text-muted tabular-nums">{share.percent}%</span>
+                </p>
+                <p className={`shrink-0 font-semibold tabular-nums ${share.amount < 0 ? "text-danger" : ""}`}>
+                  {rupiah(share.amount)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </GlassCard>
 
       <GlassCard className="mt-4 p-4">
         <SectionTitle icon={FileSpreadsheet} tone="teal">

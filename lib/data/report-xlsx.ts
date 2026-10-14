@@ -249,7 +249,6 @@ export function salesWorkbook(
     [text("Omzet", true), money(report.total)],
     [text("Harga pokok", true), money(report.cost)],
     [text("Laba kotor", true), money(report.profit)],
-    [text("Jasa", true), money(report.labor)],
     [text("Sparepart", true), money(report.parts)],
     [],
     [text("Tempat uang", true), text("Jumlah", true)],
@@ -259,6 +258,17 @@ export function salesWorkbook(
     ...report.sources.map((source) => [text(source.label), money(source.count), money(source.amount)]),
     [],
     [text("Laba kotor adalah omzet dikurangi harga pokok sparepart. Pengeluaran kas tidak masuk laporan ini.")],
+    [],
+    [text("Pembagian keuntungan", true), text("Peran", true), text("Persen", true), text("Jumlah", true)],
+    ...(report.shares.length === 0
+      ? [[text("Persentase bagi hasil belum diatur.")]]
+      : report.shares.map((share) => [
+          text(share.name),
+          text(share.role || "-"),
+          text(`${share.percent}%`),
+          money(share.amount),
+        ])),
+    [text("Bagian tiap orang dihitung dari laba kotor memakai persentase bagi hasil.")],
   ];
 
   const detail: Cell[][] = [
@@ -292,7 +302,7 @@ export function salesWorkbook(
   if (report.sales.length === 0) detail.push([text("Belum ada penjualan pada periode ini.")]);
 
   return workbookXml([
-    { name: "Ringkasan", rows: summary, widths: [22, 24, 18] },
+    { name: "Ringkasan", rows: summary, widths: [28, 48, 14, 16] },
     {
       name: "Penjualan",
       rows: detail,

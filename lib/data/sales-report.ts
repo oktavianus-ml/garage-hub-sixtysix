@@ -1,6 +1,8 @@
+import { isRole, roleLabel } from "@/lib/auth/roles";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { isBusinessDay, jakartaDate, monthKeyOf } from "@/lib/data/format";
 import { parsePayMethod, payMethodLabel, type PayMethod } from "@/lib/data/payment";
+import { allocateShares, partnersFromRecord } from "@/lib/data/profit-split";
 
 const FULL_MONTHS = [
   "Januari",
@@ -52,6 +54,14 @@ export type SaleLine = {
   payLabel: string;
 };
 
+export type ProfitCut = {
+  id: string;
+  name: string;
+  role: string;
+  percent: number;
+  amount: number;
+};
+
 export type SalesReport = {
   period: ReportPeriod;
   sales: SaleLine[];
@@ -63,6 +73,7 @@ export type SalesReport = {
   profit: number;
   channels: { label: string; amount: number }[];
   sources: { label: SaleSource; count: number; amount: number }[];
+  shares: ProfitCut[];
 };
 
 export function formatDay(iso: string) {
@@ -133,6 +144,14 @@ function num(value: unknown) {
 function payLabel(value: unknown) {
   const method = parsePayMethod(value);
   return method ? payMethodLabel[method] : "Belum dicatat";
+}
+
+function shareRole(id: string, roles: Map<string, string>) {
+  const stored = roles.get(id);
+  if (isRole(stored)) return roleLabel[stored];
+  if (id === "owner") return roleLabel.pemilik;
+  if (id === "investor") return roleLabel.investor;
+  return "";
 }
 
 function inPeriod(date: string, period: ReportPeriod) {
@@ -207,14 +226,21 @@ export async function loadSalesReport(period: ReportPeriod): Promise<SalesReport
   const database = getAdminFirestore();
   const orders = database.collection("serviceOrders");
   const walkIns = database.collection("walkInSales");
-  const [orderSnap, saleSnap] = await Promise.all(
+  const salesQuery =
     period.mode === "bulan"
-      ? [orders.where("monthKey", "==", period.month).get(), walkIns.where("monthKey", "==", period.month).get()]
-      : [
+      ? Promise.all([
+          orders.where("monthKey", "==", period.month).get(),
+          walkIns.where("monthKey", "==", period.month).get(),
+        ])
+      : Promise.all([
           orders.where("paidDate", ">=", period.from).where("paidDate", "<=", period.to).get(),
           walkIns.where("businessDate", ">=", period.from).where("businessDate", "<=", period.to).get(),
-        ],
-  );
+        ]);
+  const [[orderSnap, saleSnap], splitSnap, userSnap] = await Promise.all([
+    salesQuery,
+    database.doc("settings/profitSplit").get(),
+    database.collection("users").get(),
+  ]);
 
   const drafted = [
     ...orderSnap.docs.flatMap((doc) => {
@@ -256,10 +282,24 @@ export async function loadSalesReport(period: ReportPeriod): Promise<SalesReport
   }));
   if (unrecorded > 0) channels.push({ label: "Belum dicatat", amount: unrecorded });
 
-  const sources = (["Servis", "Kasir"] as const).map((label) => {
+  const sources = (["Kasir"] as const).map((label) => {
     const group = sales.filter((line) => line.source === label);
     return { label, count: group.length, amount: group.reduce((total, line) => total + line.total, 0) };
   });
+
+  const roles = new Map<string, string>();
+  for (const doc of userSnap.docs) {
+    const role = doc.data().role;
+    if (typeof role === "string") roles.set(doc.id, role);
+  }
+  const profit = sum((line) => line.profit);
+  const shares = allocateShares(profit, partnersFromRecord(splitSnap.data())).map((share) => ({
+    id: share.id,
+    name: share.name,
+    role: shareRole(share.id, roles),
+    percent: share.percent,
+    amount: share.amount,
+  }));
 
   return {
     period,
@@ -269,8 +309,9 @@ export async function loadSalesReport(period: ReportPeriod): Promise<SalesReport
     parts: sum((line) => line.parts),
     total: sum((line) => line.total),
     cost: sum((line) => line.cost),
-    profit: sum((line) => line.profit),
+    profit,
     channels,
     sources,
+    shares,
   };
 }

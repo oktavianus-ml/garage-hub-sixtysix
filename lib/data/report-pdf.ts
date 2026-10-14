@@ -255,8 +255,8 @@ export function salesPdf(
     if (y - height < BOTTOM) startPage(true);
   }
 
-  function pair(label: string, value: string) {
-    text(LEFT, y, label, { size: 9, color: MUTED });
+  function pair(label: string, value: string, maxWidth?: number) {
+    text(LEFT, y, label, { size: 9, color: MUTED, maxWidth });
     text(0, y, value, { size: 9, bold: true, align: "right", right: LEFT + 250 });
     y -= 14;
   }
@@ -278,7 +278,6 @@ export function salesPdf(
   pair("Omzet", rupiahPlain(report.total));
   pair("Harga pokok", rupiahPlain(report.cost));
   pair("Laba kotor", rupiahPlain(report.profit));
-  pair("Jasa", rupiahPlain(report.labor));
   pair("Sparepart", rupiahPlain(report.parts));
   y -= 4;
   text(LEFT, y, "Tempat uang", { size: 10, bold: true });
@@ -292,6 +291,23 @@ export function salesPdf(
   }
   y -= 4;
   text(LEFT, y, "Laba kotor = omzet dikurangi harga pokok sparepart. Pengeluaran kas tidak termasuk.", {
+    size: 8,
+    color: MUTED,
+    maxWidth: RIGHT - LEFT,
+  });
+  y -= 18;
+  text(LEFT, y, "Pembagian keuntungan", { size: 10, bold: true });
+  y -= 15;
+  if (report.shares.length === 0) {
+    text(LEFT, y, "Persentase bagi hasil belum diatur.", { size: 9, color: MUTED });
+    y -= 14;
+  } else {
+    for (const share of report.shares) {
+      const who = share.role ? `${share.name} · ${share.role}` : share.name;
+      pair(`${who} ${share.percent}%`, rupiahPlain(share.amount), 168);
+    }
+  }
+  text(LEFT, y, "Bagian tiap orang dihitung dari laba kotor memakai persentase bagi hasil.", {
     size: 8,
     color: MUTED,
     maxWidth: RIGHT - LEFT,
