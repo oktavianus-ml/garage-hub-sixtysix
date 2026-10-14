@@ -64,6 +64,20 @@ function vehicleChoices(vehicle: Vehicle) {
   };
 }
 
+function nationalDigits(value: string) {
+  let digits = value.replace(/\D/g, "");
+  if (digits.startsWith("62")) digits = digits.slice(2);
+  else if (digits.startsWith("0")) digits = digits.slice(1);
+  return digits.slice(0, 13);
+}
+
+function phoneVariants(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  if (!digits) return [];
+  const national = digits.startsWith("62") ? digits.slice(2) : digits.startsWith("0") ? digits.slice(1) : digits;
+  return [digits, national, `0${national}`, `62${national}`];
+}
+
 function matchesQuery(customer: Customer, bikes: Vehicle[], query: string) {
   const text = query.trim().toLowerCase();
   if (!text) return true;
@@ -71,6 +85,7 @@ function matchesQuery(customer: Customer, bikes: Vehicle[], query: string) {
   const fields = [
     customer.name,
     customer.phone,
+    ...phoneVariants(customer.phone),
     ...bikes.flatMap((bike) => [bike.plate, bike.brand, bike.bikeType, String(bike.year)]),
   ];
   return fields.some((field) => {
@@ -216,7 +231,7 @@ function CustomerDetail({
 function CustomerForm({ customer, canWrite }: { customer: Customer | null; canWrite: boolean }) {
   const [state, action, pending] = useActionState(saveCustomerAction, null);
   const [name, setName] = useState(customer?.name ?? "");
-  const [phone, setPhone] = useState(customer?.phone ?? "");
+  const [phone, setPhone] = useState(nationalDigits(customer?.phone ?? ""));
   const cancelHref = customer ? customerHref(customer.id) : "/pelanggan";
 
   return (
@@ -238,13 +253,19 @@ function CustomerForm({ customer, canWrite }: { customer: Customer | null; canWr
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
-          <input
-            name="phone"
-            placeholder="Telepon"
-            className={inputClass}
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-          />
+          <label className={cn(inputClass, "flex items-center gap-2")}>
+            <span className="shrink-0 font-medium text-muted">+62</span>
+            <input
+              inputMode="tel"
+              autoComplete="tel-national"
+              aria-label="Telepon"
+              placeholder="8123456789"
+              className="min-w-0 flex-1 bg-transparent outline-none"
+              value={phone}
+              onChange={(event) => setPhone(nationalDigits(event.target.value))}
+            />
+            <input type="hidden" name="phone" value={phone ? `+62${phone}` : ""} />
+          </label>
           {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
           <p className="text-sm leading-6 text-muted">
             {customer
