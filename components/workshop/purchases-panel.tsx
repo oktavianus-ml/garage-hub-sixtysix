@@ -743,11 +743,6 @@ function PurchaseDirectory({
             <ul className="mt-2 divide-y divide-line">
               {visible.map((purchase) => {
                 const editingThis = editingId === purchase.id;
-                const receivingThis = receivingId === purchase.id;
-                const open = purchase.status === "dipesan" || purchase.status === "sebagian";
-                const payload = purchase.lines
-                  .map((line) => ({ productId: line.productId, qty: receiveQty[line.productId] ?? 0 }))
-                  .filter((line) => line.qty > 0);
                 return (
                   <li key={purchase.id} className={cn("py-3", editingThis && "-mx-2 rounded-xl bg-teal-soft px-2")}>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -800,18 +795,8 @@ function PurchaseDirectory({
                             </button>
                           </form>
                         ) : null}
-                        {stage === "penerimaan" && open ? (
-                          <button
-                            type="button"
-                            className="h-9 rounded-xl border border-line bg-chip px-3 text-sm font-semibold"
-                            onClick={() => (receivingThis ? setReceivingId("") : beginReceive(purchase))}
-                          >
-                            {receivingThis ? "Tutup penerimaan" : "Terima barang"}
-                          </button>
-                        ) : null}
                         {((stage === "permintaan" && purchase.status === "diminta") ||
-                          (stage === "persetujuan" && purchase.status === "diminta" && canOrder) ||
-                          (stage === "penerimaan" && purchase.status === "dipesan" && canOrder)) &&
+                          (stage === "persetujuan" && purchase.status === "diminta" && canOrder)) &&
                         purchase.lines.every((line) => line.received === 0) ? (
                           <form action={cancelAction}>
                             <input type="hidden" name="id" value={purchase.id} />
@@ -826,45 +811,6 @@ function PurchaseDirectory({
                           </form>
                         ) : null}
                       </div>
-                    ) : null}
-                    {stage === "penerimaan" && open && receivingThis ? (
-                      <form action={receiveAction} className="mt-3 rounded-xl border border-line bg-chip/60 p-3">
-                        <input type="hidden" name="id" value={purchase.id} />
-                        <input type="hidden" name="lines" value={JSON.stringify(payload)} />
-                        <p className="text-sm leading-6 text-muted">
-                          Isi jumlah yang datang. Stok bertambah dan harga pokok mengikuti harga beli.
-                        </p>
-                        <ul className="mt-2 divide-y divide-line">
-                          {purchase.lines.map((line) => {
-                            const remaining = line.qty - line.received;
-                            if (remaining <= 0) return null;
-                            return (
-                              <li key={line.productId} className="flex items-center justify-between gap-3 py-2">
-                                <span className="text-sm">
-                                  {line.name}
-                                  <span className="text-muted"> · sisa {remaining}</span>
-                                </span>
-                                <input
-                                  inputMode="numeric"
-                                  aria-label={`Jumlah datang ${line.name}`}
-                                  value={receiveQty[line.productId] ?? 0}
-                                  className="h-11 w-20 rounded-xl border border-line bg-field px-2 text-center tabular-nums"
-                                  onChange={(event) => {
-                                    const qty = Number(event.target.value.replace(/[^\d]/g, "") || "0");
-                                    setReceiveQty((current) => ({
-                                      ...current,
-                                      [line.productId]: Math.min(remaining, qty),
-                                    }));
-                                  }}
-                                />
-                              </li>
-                            );
-                          })}
-                        </ul>
-                        <SaveButton pending={receivePending} disabled={payload.length === 0} className="mt-3 w-full">
-                          Simpan penerimaan
-                        </SaveButton>
-                      </form>
                     ) : null}
                   </li>
                 );
