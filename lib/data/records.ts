@@ -327,7 +327,7 @@ function orderFields(order: {
   return {
     Pelanggan: order.customerName,
     Plat: order.plate,
-    Keluhan: order.complaint,
+    Pekerjaan: order.complaint,
     Mekanik: order.mechanicName,
     Ongkos: rupiah(order.laborCost),
     Part: partsText(order.parts),

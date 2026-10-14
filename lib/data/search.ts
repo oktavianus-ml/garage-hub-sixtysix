@@ -2,6 +2,7 @@
 
 import { accessFor } from "@/lib/auth/access";
 import { getSessionUser } from "@/lib/auth/session";
+import { isNavHidden } from "@/lib/nav";
 import { listCustomers, listOrders, listVehicles } from "@/lib/data/records";
 
 export type SearchHit = {
@@ -30,7 +31,7 @@ export async function searchWorkshopAction(raw: string): Promise<SearchHit[]> {
   const needle = query.toLowerCase();
   const plateNeedle = fold(query);
   const canCustomer = accessFor(user.role, "/pelanggan") !== "none";
-  const canService = accessFor(user.role, "/service") !== "none";
+  const canService = accessFor(user.role, "/service") !== "none" && !isNavHidden("/service");
   const hits: SearchHit[] = [];
 
   if (canCustomer) {

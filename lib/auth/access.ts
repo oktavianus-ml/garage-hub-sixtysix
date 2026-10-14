@@ -1,4 +1,5 @@
 import type { Role } from "@/lib/auth/roles";
+import { isNavHidden } from "@/lib/nav";
 
 export type Access = "none" | "read" | "write";
 
@@ -102,7 +103,7 @@ export function allowedHrefs(role: Role) {
     "/riwayat",
     "/pengaturan",
   ];
-  return hrefs.filter((href) => accessFor(role, href) !== "none");
+  return hrefs.filter((href) => accessFor(role, href) !== "none" && !isNavHidden(href));
 }
 
 export function canMarkPaid(role: Role) {

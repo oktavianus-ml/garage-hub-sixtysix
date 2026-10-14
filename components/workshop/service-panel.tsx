@@ -6,6 +6,8 @@ import { saveServiceAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
 import { PAY_METHODS, payMethodLabel } from "@/lib/data/payment";
 import type { Customer, Product, ServiceOrder, SpkStatus, StaffUser, Vehicle } from "@/lib/data/records";
+import { composeComplaint, parseComplaint, SERVICE_JOBS } from "@/lib/data/service-jobs";
+import { cn } from "@/lib/cn";
 import { inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
 import { SectionTitle } from "@/components/ui/section-title";
@@ -50,6 +52,15 @@ export function ServicePanel({
   const [customerId, setCustomerId] = useState(editing?.customerId ?? "");
   const [status, setStatus] = useState<SpkStatus>(editing?.status ?? "antri");
   const [parts, setParts] = useState(editing?.parts.map((part) => ({ productId: part.productId, qty: part.qty })) ?? []);
+  const initialJobs = useMemo(() => parseComplaint(editing?.complaint ?? ""), [editing?.complaint]);
+  const [jobIds, setJobIds] = useState(initialJobs.ids);
+  const [otherJob, setOtherJob] = useState(initialJobs.other);
+  const [otherOpen, setOtherOpen] = useState(initialJobs.other.length > 0);
+  const [jobError, setJobError] = useState("");
+  const complaint = useMemo(
+    () => composeComplaint(jobIds, otherOpen ? otherJob : ""),
+    [jobIds, otherJob, otherOpen],
+  );
   const bikes = vehicles.filter((vehicle) => vehicle.customerId === customerId);
   const locked = !canWrite || (!canPay && (editing?.status === "lunas" || editing?.status === "batal"));
   const statuses: SpkStatus[] = canPay
@@ -71,9 +82,21 @@ export function ServicePanel({
           {locked ? (
             <p className="mt-3 text-sm text-muted">SPK ini tidak bisa diubah dari peran ini.</p>
           ) : (
-            <form action={action} className="mt-3 flex flex-col gap-3">
+            <form
+              action={action}
+              className="mt-3 flex flex-col gap-3"
+              onSubmit={(event) => {
+                if (complaint.trim()) {
+                  setJobError("");
+                  return;
+                }
+                event.preventDefault();
+                setJobError("Pilih pekerjaan atau isi lain-lain.");
+              }}
+            >
               {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
               <input type="hidden" name="parts" value={JSON.stringify(parts)} />
+              <input type="hidden" name="complaint" value={complaint} />
               <select
                 name="customerId"
                 required
@@ -96,13 +119,70 @@ export function ServicePanel({
                   </option>
                 ))}
               </select>
-              <textarea
-                name="complaint"
-                required
-                placeholder="Keluhan"
-                defaultValue={editing?.complaint ?? ""}
-                className={`${inputClass} h-24 py-2`}
-              />
+              <div className="rounded-xl border border-teal/25 bg-teal-soft p-2">
+                <div className="grid grid-cols-4 gap-1.5">
+                  {SERVICE_JOBS.map((job) => {
+                    const active = jobIds.includes(job.id);
+                    return (
+                      <button
+                        key={job.id}
+                        type="button"
+                        aria-pressed={active}
+                        className={cn(
+                          "rounded-lg border px-1.5 py-1.5 text-center text-xs font-semibold leading-tight",
+                          active ? "border-amber bg-field text-ink" : "border-transparent bg-field/70 text-ink",
+                        )}
+                        onClick={() => {
+                          setJobError("");
+                          setJobIds((current) =>
+                            current.includes(job.id)
+                              ? current.filter((id) => id !== job.id)
+                              : [...current, job.id],
+                          );
+                        }}
+                      >
+                        {job.title}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    aria-pressed={otherOpen}
+                    className={cn(
+                      "rounded-lg border px-1.5 py-1.5 text-center text-xs font-semibold leading-tight",
+                      otherOpen ? "border-amber bg-field text-ink" : "border-transparent bg-field/70 text-ink",
+                    )}
+                    onClick={() => {
+                      setJobError("");
+                      setOtherOpen((open) => !open);
+                    }}
+                  >
+                    Lain-lain
+                  </button>
+                </div>
+                {jobIds.length > 0 ? (
+                  <ul className="mt-2 space-y-1.5">
+                    {SERVICE_JOBS.filter((job) => jobIds.includes(job.id)).map((job) => (
+                      <li key={job.id} className="rounded-lg bg-field/80 px-2 py-1.5 text-xs leading-5 text-muted">
+                        <span className="font-semibold text-ink">{job.title}. </span>
+                        {job.tasks.map((task) => task.charAt(0).toUpperCase() + task.slice(1)).join(", ")}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {otherOpen ? (
+                  <input
+                    value={otherJob}
+                    placeholder="Misalnya bunyi mesin"
+                    className={`${inputClass} mt-2 h-9 text-sm`}
+                    onChange={(event) => {
+                      setJobError("");
+                      setOtherJob(event.target.value);
+                    }}
+                  />
+                ) : null}
+              </div>
+              {jobError ? <p className="text-sm text-danger">{jobError}</p> : null}
               <select name="mechanicId" required className={inputClass} defaultValue={editing?.mechanicId ?? ""}>
                 <option value="">Mekanik</option>
                 {mechanics.map((mechanic) => (

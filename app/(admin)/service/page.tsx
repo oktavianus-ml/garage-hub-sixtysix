@@ -27,10 +27,11 @@ export default async function ServicePage({
     <div>
       <PageHeader
         title="Service (SPK)"
-        description="Order servis motor: keluhan, mekanik, part terpakai, dan ongkos jasa."
+        description="Order servis motor: pekerjaan, mekanik, part terpakai, dan ongkos jasa."
         href="/service"
       />
       <ServicePanel
+        key={editing?.id ?? "baru"}
         orders={orders}
         customers={customers}
         vehicles={vehicles}

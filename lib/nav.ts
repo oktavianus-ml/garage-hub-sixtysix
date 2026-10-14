@@ -29,6 +29,7 @@ export type NavItem = {
   href: string;
   icon: LucideIcon;
   description: string;
+  hidden?: boolean;
   children?: NavItem[];
 };
 
@@ -56,8 +57,9 @@ export const navGroups: NavGroup[] = [
         label: "Service (SPK)",
         href: "/service",
         icon: Wrench,
+        hidden: true,
         description:
-          "Order servis motor: keluhan, mekanik, part terpakai, dan ongkos jasa.",
+          "Order servis motor: pekerjaan, mekanik, part terpakai, dan ongkos jasa.",
       },
       {
         label: "Kasir",
@@ -236,6 +238,10 @@ export const navGroups: NavGroup[] = [
   },
 ];
 
+export function isNavHidden(href: string) {
+  return findNavItem(href)?.hidden === true;
+}
+
 export function findNavItem(href: string) {
   for (const group of navGroups) {
     for (const item of group.items) {
@@ -260,7 +266,7 @@ export const bottomNavItems: NavItem[] = [
   requireNavItem("/service"),
   { ...requireNavItem("/inventori"), label: "Stok" },
   requireNavItem("/kasir"),
-];
+].filter((item) => !item.hidden);
 
 export function isActivePath(pathname: string, href: string) {
   return href === "/" ? pathname === "/" : pathname === href;

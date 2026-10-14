@@ -470,13 +470,15 @@ export async function saveServiceAction(_prev: FormState, formData: FormData): P
     return { message: "Daftar part tidak valid." };
   }
   if (laborCost === null) return { message: "Isi ongkos jasa." };
+  const complaint = String(formData.get("complaint") ?? "").trim();
+  if (!complaint) return { message: "Pilih pekerjaan atau isi lain-lain." };
   try {
     await saveServiceOrder(
       {
         id: String(formData.get("id") ?? "") || undefined,
         customerId: String(formData.get("customerId") ?? ""),
         vehicleId: String(formData.get("vehicleId") ?? ""),
-        complaint: String(formData.get("complaint") ?? "").trim(),
+        complaint,
         mechanicId: String(formData.get("mechanicId") ?? ""),
         laborCost,
         parts,
