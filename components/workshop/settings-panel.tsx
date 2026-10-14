@@ -206,7 +206,7 @@ function ReceiptPreview({
 function DisplayModeCard() {
   const { resolvedTheme, setTheme } = useTheme();
   const mounted = useSyncExternalStore(subscribe, () => true, () => false);
-  const dark = !mounted || resolvedTheme !== "light";
+  const dark = mounted && resolvedTheme !== "light";
 
   return (
     <GlassCard className="p-4">
@@ -227,11 +227,11 @@ function DisplayModeCard() {
         </button>
         <button
           type="button"
-          aria-pressed={mounted && !dark}
+          aria-pressed={!dark}
           onClick={() => setTheme("light")}
           className={cn(
             "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border text-sm font-semibold",
-            mounted && !dark ? "border-amber bg-amber-soft text-ink" : "border-line bg-chip text-muted",
+            !dark ? "border-amber bg-amber-soft text-ink" : "border-line bg-chip text-muted",
           )}
         >
           <Sun className="size-4" aria-hidden />

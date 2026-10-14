@@ -15,7 +15,7 @@ export function ThemeToggle() {
     () => true,
     () => false,
   );
-  const dark = !mounted || resolvedTheme !== "light";
+  const dark = mounted && resolvedTheme !== "light";
 
   return (
     <button
