@@ -7,6 +7,7 @@ import { rupiah } from "@/lib/data/format";
 import { PAY_METHODS, payMethodLabel } from "@/lib/data/payment";
 import type { Customer, CustomerPayment } from "@/lib/data/records";
 import { inputClass } from "@/components/ui/controls";
+import { MoneyInput } from "@/components/ui/money-input";
 import { SaveButton } from "@/components/ui/save-button";
 import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -55,13 +56,7 @@ export function PaymentDesk({
                   </option>
                 ))}
               </select>
-              <input
-                name="amount"
-                required
-                inputMode="numeric"
-                placeholder="Jumlah yang dibayar"
-                className={inputClass}
-              />
+              <MoneyInput name="amount" required placeholder="Jumlah yang dibayar" />
               <input name="note" placeholder="Catatan, misalnya plat atau nomor SPK" className={inputClass} />
               {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
               <SaveButton pending={pending}>Simpan pembayaran</SaveButton>

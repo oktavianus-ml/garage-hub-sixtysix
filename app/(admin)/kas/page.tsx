@@ -5,7 +5,7 @@ import { guard } from "@/lib/auth/guard";
 import { isBusinessDay, jakartaDate, monthKeyOf } from "@/lib/data/format";
 import { cashSnapshot, getCashDay, previewMonth } from "@/lib/data/records";
 
-export const metadata = { title: "Pantauan" };
+export const metadata = { title: "Cek uang" };
 
 export default async function KasPage({
   searchParams,
@@ -24,8 +24,8 @@ export default async function KasPage({
   return (
     <div>
       <PageHeader
-        title="Pantauan"
-        description="Tiga jumlah hari ini, lalu daftar orang yang membayar."
+        title="Cek uang"
+        description="Total satu hari, bukan per pelanggan. Bandingkan dengan uang yang benar-benar ada."
         href="/kas"
       />
       <form action="/kas" className="mt-5 flex max-w-md gap-2">

@@ -161,23 +161,15 @@ export const navGroups: NavGroup[] = [
     items: [
       {
         label: "Pembayaran",
-        href: "/pembayaran",
+        href: "/pembayaran/catat",
         icon: Banknote,
-        description: "Catat pembayaran pelanggan, lalu pantau uang yang benar-benar masuk.",
-        children: [
-          {
-            label: "Catat",
-            href: "/pembayaran/catat",
-            icon: ClipboardPen,
-            description: "Catat tiap pelanggan beserta tempat uang dan jumlah yang dibayar.",
-          },
-          {
-            label: "Pantauan",
-            href: "/kas",
-            icon: Wallet,
-            description: "Pantau tunai, QRIS, dan rekening bank terhadap uang yang benar-benar masuk.",
-          },
-        ],
+        description: "Catat satu per satu: pelanggan, tunai, QRIS, atau transfer, dan jumlahnya.",
+      },
+      {
+        label: "Cek uang",
+        href: "/kas",
+        icon: Wallet,
+        description: "Total satu hari, bukan per pelanggan. Bandingkan dengan uang yang benar-benar ada.",
       },
       {
         label: "Laporan",

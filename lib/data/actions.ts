@@ -572,12 +572,14 @@ export async function saveCashAction(_prev: FormState, formData: FormData): Prom
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const day = String(formData.get("day") ?? "");
   if (!isBusinessDay(day)) return { message: "Tanggal tidak valid." };
-  const cashOut = asInt(formData.get("cashOut"));
+  const cashOutField = optionalMoney(formData.get("cashOut"));
   const counted = asInt(formData.get("counted"));
   const qrisReceived = optionalMoney(formData.get("qrisReceived"));
   const bankReceived = optionalMoney(formData.get("bankReceived"));
-  if (cashOut === null || counted === null) return { message: "Isi pengeluaran dari laci dan uang tunai yang dihitung." };
-  if (qrisReceived === "bad" || bankReceived === "bad") return { message: "Isi uang yang masuk dengan angka." };
+  if (cashOutField === "bad" || counted === null || qrisReceived === "bad" || bankReceived === "bad") {
+    return { message: "Isi tunai di laci. Kolom lain boleh kosong, atau diisi angka." };
+  }
+  const cashOut = cashOutField ?? 0;
   try {
     await saveCashDay(
       {

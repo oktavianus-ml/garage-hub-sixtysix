@@ -5,7 +5,7 @@ import { guard } from "@/lib/auth/guard";
 import { isBusinessDay, jakartaDate, monthKeyOf } from "@/lib/data/format";
 import { cashSnapshot, listCustomers, previewMonth } from "@/lib/data/records";
 
-export const metadata = { title: "Catat pembayaran" };
+export const metadata = { title: "Pembayaran" };
 
 export default async function CatatPembayaranPage({
   searchParams,
@@ -24,8 +24,8 @@ export default async function CatatPembayaranPage({
   return (
     <div>
       <PageHeader
-        title="Catat pembayaran"
-        description="Catat tiap pelanggan: tempat uang dan jumlah yang dibayar."
+        title="Pembayaran"
+        description="Catat satu per satu: pelanggan, tunai, QRIS, atau transfer, dan jumlahnya."
         href="/pembayaran/catat"
       />
       <form action="/pembayaran/catat" className="mt-5 flex max-w-md gap-2">

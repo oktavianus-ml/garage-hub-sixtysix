@@ -35,7 +35,7 @@ export const activityEntityLabel: Record<ActivityEntity, string> = {
   pegawai: "Pegawai",
   spk: "Service (SPK)",
   kasir: "Kasir",
-  kas: "Pantauan",
+  kas: "Cek uang",
   pembayaran: "Pembayaran",
   "bagi-hasil": "Bagi hasil",
   audit: "Audit budget",
