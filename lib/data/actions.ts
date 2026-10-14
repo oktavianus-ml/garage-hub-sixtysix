@@ -218,7 +218,7 @@ function readPurchaseLines(raw: FormDataEntryValue | null) {
   return lines;
 }
 
-function readReceiveLines(raw: FormDataEntryValue | null) {
+function readReceiveLines(raw: FormDataEntryValue | null, allowEmpty = false) {
   let parsed: unknown;
   try {
     parsed = JSON.parse(String(raw ?? "[]"));
@@ -237,7 +237,7 @@ function readReceiveLines(raw: FormDataEntryValue | null) {
     }
     if (qty > 0) lines.push({ productId, qty });
   }
-  if (lines.length === 0) return { message: "Isi jumlah barang yang datang." } satisfies FormState;
+  if (lines.length === 0 && !allowEmpty) return { message: "Isi jumlah barang yang datang." } satisfies FormState;
   return lines;
 }
 
@@ -428,10 +428,11 @@ export async function receivePurchaseAction(_prev: FormState, formData: FormData
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "");
   if (!id) return { message: "Pilih pesanan." };
-  const lines = readReceiveLines(formData.get("lines"));
+  const closeShort = formData.get("closeShort") === "1";
+  const lines = readReceiveLines(formData.get("lines"), closeShort);
   if (!Array.isArray(lines)) return lines;
   try {
-    await receivePurchase(id, lines, access.user);
+    await receivePurchase(id, lines, access.user, { closeShort });
   } catch (error) {
     return fail(error);
   }

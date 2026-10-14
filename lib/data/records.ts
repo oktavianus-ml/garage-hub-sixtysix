@@ -884,13 +884,15 @@ export async function receivePurchase(
   id: string,
   inputLines: { productId: string; qty: number }[],
   actor: ActivityActor,
+  options?: { closeShort?: boolean },
 ) {
+  const closeShort = options?.closeShort === true;
   const qtyByProduct = new Map<string, number>();
   for (const line of inputLines) {
     if (!line.productId || !Number.isInteger(line.qty) || line.qty <= 0) continue;
     qtyByProduct.set(line.productId, (qtyByProduct.get(line.productId) ?? 0) + line.qty);
   }
-  if (qtyByProduct.size === 0) throw new Error("Isi jumlah barang yang datang.");
+  if (qtyByProduct.size === 0 && !closeShort) throw new Error("Isi jumlah barang yang datang.");
 
   const database = store();
   await database.runTransaction(async (tx) => {
@@ -934,31 +936,35 @@ export async function receivePurchase(
         });
       }
     }
-    const status: PurchaseStatus = nextLines.every((line) => line.received >= line.qty)
-      ? "diterima"
-      : "sebagian";
-    tx.update(ref, {
-      lines: nextLines,
-      status,
-      receipts: [...purchase.receipts, { at: new Date().toISOString(), lines: receiptLines }],
-    });
+    const complete = nextLines.every((line) => line.received >= line.qty);
+    if (closeShort && !nextLines.some((line) => line.received > 0)) {
+      throw new Error("Belum ada barang masuk stok. Batalkan pesanan jika tidak jadi diterima.");
+    }
+    const status: PurchaseStatus = complete || closeShort ? "diterima" : "sebagian";
+    const ordered = nextLines.reduce((sum, line) => sum + line.qty, 0);
+    const received = nextLines.reduce((sum, line) => sum + line.received, 0);
+    const receipts =
+      receiptLines.length > 0
+        ? [...purchase.receipts, { at: new Date().toISOString(), lines: receiptLines }]
+        : purchase.receipts;
+    tx.update(ref, { lines: nextLines, status, receipts });
     const qtyTotal = receiptLines.reduce((sum, line) => sum + line.qty, 0);
+    const after: Record<string, string> = { Status: purchaseStatusLabel[status] };
+    if (receiptLines.length > 0) {
+      after.Datang = receiptLines.map((line) => `${line.name} ×${line.qty}`).join(", ");
+    }
+    if (closeShort && !complete) after.Diterima = `${received} dari ${ordered}`;
     queueActivity(tx, {
       actor,
       action: "ubah",
       entity: "pembelian",
       entityId: id,
-      label: status === "diterima" ? `${purchase.no} diterima lengkap` : `${purchase.no} menerima ${qtyTotal} barang`,
-      changes: [
-        ...fieldChanges(
-          { Status: purchaseStatusLabel[purchase.status] },
-          {
-            Status: purchaseStatusLabel[status],
-            Datang: receiptLines.map((line) => `${line.name} ×${line.qty}`).join(", "),
-          },
-        ),
-        ...stockLogs,
-      ],
+      label: complete
+        ? `${purchase.no} diterima lengkap`
+        : closeShort
+          ? `${purchase.no} ditutup, diterima ${received} dari ${ordered}`
+          : `${purchase.no} menerima ${qtyTotal} barang`,
+      changes: [...fieldChanges({ Status: purchaseStatusLabel[purchase.status] }, after), ...stockLogs],
     });
   });
 }

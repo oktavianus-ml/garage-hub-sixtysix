@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useActionState, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ClipboardList, List, Pencil, Search } from "lucide-react";
 import {
@@ -20,7 +20,22 @@ import { GlassCard } from "@/components/ui/glass-card";
 
 const PAGE_SIZE = 6;
 
+const receiveButton =
+  "inline-flex h-12 shrink-0 items-center justify-center rounded-xl px-6 text-sm font-semibold disabled:opacity-60";
+const cancelButton =
+  "inline-flex h-12 shrink-0 items-center justify-center rounded-xl border border-[#c2413b]/55 bg-gradient-to-b from-[#fff1ef] via-[#f7c7c3] to-[#e58b84] px-6 text-sm font-semibold text-[#3f1614] shadow-[0_1px_2px_rgba(194,65,59,0.22),inset_0_1px_0_rgba(255,255,255,0.7)] disabled:opacity-60";
+const closeShortButton =
+  "inline-flex h-12 shrink-0 items-center justify-center rounded-xl border border-amber/45 bg-amber-soft px-5 text-sm font-semibold text-amber disabled:opacity-60";
+
 type DraftLine = { productId: string; qty: number; cost: number };
+
+function QtyMark({ qty }: { qty: number }) {
+  return (
+    <span className="inline-flex min-w-[3.5rem] items-center justify-center rounded-lg bg-amber-soft px-2.5 py-1 text-base font-bold text-amber tabular-nums">
+      {qty}
+    </span>
+  );
+}
 
 function StatusMark({ status }: { status: PurchaseStatus }) {
   const tone =
@@ -358,6 +373,7 @@ function PurchaseDirectory({
   const [page, setPage] = useState(0);
   const [receivingId, setReceivingId] = useState("");
   const [receiveQty, setReceiveQty] = useState<Record<string, number>>({});
+  const [confirm, setConfirm] = useState<{ id: string; kind: "save" | "close" | "remainder" } | null>(null);
   const purchaseSnapshot = purchases
     .map((item) => item.lines.map((line) => `${item.id}:${line.received}:${item.status}`).join(","))
     .join("|");
@@ -365,6 +381,7 @@ function PurchaseDirectory({
   useEffect(() => {
     setReceivingId("");
     setReceiveQty({});
+    setConfirm(null);
   }, [purchaseSnapshot]);
   const queued = useMemo(
     () => purchases.filter((purchase) => isWaiting(purchase, stage)),
@@ -433,7 +450,295 @@ function PurchaseDirectory({
           ) : null}
           {visible.length === 0 && finished.length === 0 ? (
             <p className="mt-3 text-sm text-muted">Tidak ada yang cocok.</p>
-          ) : visible.length === 0 ? null : (
+          ) : visible.length === 0 ? null : stage === "penerimaan" ? (
+            <div className="mt-3 overflow-x-auto rounded-xl border border-line">
+              <table className="w-full min-w-[980px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-line bg-amber-soft text-xs font-semibold text-muted">
+                    <th scope="col" className="px-3 py-3 font-semibold">Nomor</th>
+                    <th scope="col" className="px-3 py-3 font-semibold">Distributor</th>
+                    <th scope="col" className="px-3 py-3 font-semibold">Barang</th>
+                    <th scope="col" className="px-3 py-3 text-center font-semibold">Jumlah</th>
+                    <th scope="col" className="px-3 py-3 font-semibold">Catatan</th>
+                    <th scope="col" className="px-3 py-3 text-right font-semibold">Total</th>
+                    <th scope="col" className="px-3 py-3 font-semibold">Status</th>
+                    {canWrite ? (
+                      <th scope="col" className="px-3 py-3 font-semibold">Aksi</th>
+                    ) : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((purchase) => {
+                    const receivingThis = receivingId === purchase.id;
+                    const open = purchase.status === "dipesan" || purchase.status === "sebagian";
+                    const payload = purchase.lines
+                      .map((line) => ({ productId: line.productId, qty: receiveQty[line.productId] ?? 0 }))
+                      .filter((line) => line.qty > 0);
+                    const canCancel =
+                      purchase.status === "dipesan" &&
+                      canOrder &&
+                      purchase.lines.every((line) => line.received === 0);
+                    const short = purchase.lines.some((line) => {
+                      const remaining = line.qty - line.received;
+                      return remaining > 0 && (receiveQty[line.productId] ?? 0) < remaining;
+                    });
+                    const alreadyInStock = purchase.lines.some((line) => line.received > 0);
+                    return (
+                      <Fragment key={purchase.id}>
+                        <tr className={cn("border-b border-line align-middle last:border-b-0", receivingThis && "border-b-0 bg-teal-soft")}>
+                          <td className="px-3 py-3.5 font-semibold whitespace-nowrap">{purchase.no}</td>
+                          <td className="px-3 py-3.5 font-medium">{purchase.distributorName}</td>
+                          <td className="px-3 py-3.5">
+                            <ul className="flex flex-col gap-2">
+                              {purchase.lines.map((line) => (
+                                <li key={line.productId} className="flex min-h-8 items-center">
+                                  {line.name}
+                                </li>
+                              ))}
+                            </ul>
+                            {purchase.receipts.length > 0 ? (
+                              <ul className="mt-2 flex flex-col gap-1">
+                                {purchase.receipts.map((receipt, index) => (
+                                  <li key={`${receipt.at}-${index}`} className="text-xs text-muted">
+                                    {shortWhen(receipt.at)} ·{" "}
+                                    {receipt.lines.map((line) => `${line.name} ×${line.qty}`).join(", ")}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-3.5">
+                            <ul className="flex flex-col items-center gap-2">
+                              {purchase.lines.map((line) => (
+                                <li key={line.productId} className="flex min-h-8 items-center gap-2">
+                                  <QtyMark qty={line.qty} />
+                                  {line.received > 0 ? (
+                                    <span className="text-xs font-semibold text-teal">datang {line.received}</span>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          </td>
+                          <td className="max-w-[200px] px-3 py-3.5 text-muted">{purchase.note || "—"}</td>
+                          <td className="px-3 py-3.5 text-right font-semibold whitespace-nowrap text-amber tabular-nums">
+                            {rupiah(purchase.total)}
+                          </td>
+                          <td className="px-3 py-3.5">
+                            <StatusMark status={purchase.status} />
+                          </td>
+                          {canWrite ? (
+                            <td className="px-3 py-3">
+                              <div className="flex flex-wrap gap-2">
+                                {open ? (
+                                  <button
+                                    type="button"
+                                    className={cn(
+                                      receiveButton,
+                                      receivingThis ? "border border-line bg-chip text-ink" : goldGlass,
+                                    )}
+                                    onClick={() => {
+                                      setConfirm(null);
+                                      if (receivingThis) setReceivingId("");
+                                      else beginReceive(purchase);
+                                    }}
+                                  >
+                                    {receivingThis ? "Tutup penerimaan" : "Terima barang"}
+                                  </button>
+                                ) : null}
+                                {canCancel ? (
+                                  <form action={cancelAction}>
+                                    <input type="hidden" name="id" value={purchase.id} />
+                                    <button type="submit" disabled={cancelPending} className={cancelButton}>
+                                      Batalkan
+                                    </button>
+                                  </form>
+                                ) : null}
+                                {purchase.status === "sebagian" && !receivingThis ? (
+                                  confirm?.id === purchase.id && confirm.kind === "remainder" ? (
+                                    <form action={receiveAction} className="rounded-xl border border-amber/40 bg-amber-soft px-3 py-2">
+                                      <input type="hidden" name="id" value={purchase.id} />
+                                      <input type="hidden" name="lines" value="[]" />
+                                      <p className="text-sm font-semibold">Yakin tutup sisa? Cek lagi, yang belum datang tidak masuk stok.</p>
+                                      <ul className="mt-1 text-sm">
+                                        {purchase.lines.map((line) => {
+                                          const remaining = line.qty - line.received;
+                                          if (remaining <= 0) return null;
+                                          return (
+                                            <li key={line.productId}>
+                                              {line.name} · sudah masuk {line.received} · sisa {remaining} ditutup
+                                            </li>
+                                          );
+                                        })}
+                                      </ul>
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                      <button
+                                        type="submit"
+                                        name="closeShort"
+                                        value="1"
+                                        disabled={receivePending}
+                                        className={closeShortButton}
+                                      >
+                                        Ya, tutup
+                                      </button>
+                                      <button
+                                        type="button"
+                                        disabled={receivePending}
+                                        className="inline-flex h-12 items-center justify-center rounded-xl border border-line bg-chip px-4 text-sm font-semibold"
+                                        onClick={() => setConfirm(null)}
+                                      >
+                                        Batal
+                                      </button>
+                                      </div>
+                                    </form>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className={closeShortButton}
+                                      onClick={() => setConfirm({ id: purchase.id, kind: "remainder" })}
+                                    >
+                                      Tutup sisa
+                                    </button>
+                                  )
+                                ) : null}
+                              </div>
+                            </td>
+                          ) : null}
+                        </tr>
+                        {open && receivingThis ? (
+                          <tr className="border-b border-line bg-teal-soft last:border-b-0">
+                            <td colSpan={canWrite ? 8 : 7} className="px-3 pb-4">
+                              <form action={receiveAction} className="rounded-xl border border-line bg-field p-3">
+                                <input type="hidden" name="id" value={purchase.id} />
+                                <input type="hidden" name="lines" value={JSON.stringify(payload)} />
+                                <p className="text-sm leading-6 text-muted">
+                                  Isi jumlah barang baik yang masuk stok. Barang rusak atau tidak datang jangan dihitung.
+                                  Harga pokok mengikuti harga beli.
+                                </p>
+                                <ul className="mt-3 flex max-w-xl flex-col gap-2">
+                                  {purchase.lines.map((line) => {
+                                    const remaining = line.qty - line.received;
+                                    if (remaining <= 0) return null;
+                                    return (
+                                      <li
+                                        key={line.productId}
+                                        className="flex items-center justify-between gap-4 rounded-xl border border-amber/30 bg-amber-soft px-3 py-2.5"
+                                      >
+                                        <div>
+                                          <p className="font-medium">{line.name}</p>
+                                          <p className="text-sm text-muted">Sisa {remaining}</p>
+                                        </div>
+                                        <label className="flex shrink-0 flex-col items-center gap-1">
+                                          <span className="text-xs font-semibold text-amber">Jumlah baik</span>
+                                          <input
+                                            inputMode="numeric"
+                                            aria-label={`Jumlah baik ${line.name}`}
+                                            value={receiveQty[line.productId] ?? 0}
+                                            className="h-14 w-28 rounded-xl border border-amber/40 bg-field text-center text-2xl font-bold text-amber tabular-nums"
+                                            onChange={(event) => {
+                                              const qty = Number(event.target.value.replace(/[^\d]/g, "") || "0");
+                                              setConfirm(null);
+                                              setReceiveQty((current) => ({
+                                                ...current,
+                                                [line.productId]: Math.min(remaining, qty),
+                                              }));
+                                            }}
+                                          />
+                                        </label>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                                {confirm?.id === purchase.id && (confirm.kind === "save" || confirm.kind === "close") ? (
+                                  <div className="mt-3 rounded-xl border border-amber/40 bg-amber-soft p-3">
+                                    <p className="text-sm font-semibold">
+                                      {confirm.kind === "close"
+                                        ? "Yakin terima sesuai yang datang? Cek lagi jumlah di bawah."
+                                        : "Yakin simpan penerimaan ini? Cek lagi jumlah di bawah."}
+                                    </p>
+                                    <ul className="mt-2 flex flex-col gap-1 text-sm">
+                                      {purchase.lines.map((line) => {
+                                        const remaining = line.qty - line.received;
+                                        if (remaining <= 0) return null;
+                                        const qty = receiveQty[line.productId] ?? 0;
+                                        const left = remaining - qty;
+                                        return (
+                                          <li key={line.productId}>
+                                            <span className="font-semibold">{line.name}</span>
+                                            {" · masuk stok "}
+                                            <span className="font-bold tabular-nums">{qty}</span>
+                                            {left > 0
+                                              ? confirm.kind === "close"
+                                                ? ` · sisa ${left} ditutup, tidak masuk stok`
+                                                : ` · sisa ${left} masih menunggu`
+                                              : " · sesuai pesanan"}
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                      {confirm.kind === "close" ? (
+                                        <button
+                                          type="submit"
+                                          name="closeShort"
+                                          value="1"
+                                          disabled={receivePending}
+                                          className="inline-flex h-11 items-center justify-center rounded-xl border border-amber/45 bg-field px-5 text-sm font-semibold text-amber disabled:opacity-60"
+                                        >
+                                          Ya, tutup sisa
+                                        </button>
+                                      ) : (
+                                        <SaveButton pending={receivePending}>Ya, simpan</SaveButton>
+                                      )}
+                                      <button
+                                        type="button"
+                                        disabled={receivePending}
+                                        className="inline-flex h-11 items-center justify-center rounded-xl border border-line bg-chip px-4 text-sm font-semibold"
+                                        onClick={() => setConfirm(null)}
+                                      >
+                                        Batal
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={payload.length === 0}
+                                      className={cn(goldGlass, "inline-flex h-11 items-center justify-center rounded-xl px-5 text-sm font-semibold disabled:opacity-60")}
+                                      onClick={() => setConfirm({ id: purchase.id, kind: "save" })}
+                                    >
+                                      {short ? "Sisa masih menyusul" : "Simpan penerimaan"}
+                                    </button>
+                                    {short ? (
+                                      <button
+                                        type="button"
+                                        disabled={payload.length === 0 && !alreadyInStock}
+                                        className="inline-flex h-11 items-center justify-center rounded-xl border border-amber/45 bg-amber-soft px-5 text-sm font-semibold text-amber disabled:opacity-60"
+                                        onClick={() => setConfirm({ id: purchase.id, kind: "close" })}
+                                      >
+                                        Terima sesuai yang datang
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                )}
+                                {short ? (
+                                  <p className="mt-2 text-sm leading-6 text-muted">
+                                    {payload.length === 0 && !alreadyInStock
+                                      ? "Kalau tidak ada yang masuk stok, batalkan pesanan."
+                                      : "Sisa masih menyusul membuat pesanan tetap menunggu. Terima sesuai yang datang menutup sisa, dan yang kurang tidak masuk stok."}
+                                  </p>
+                                ) : null}
+                              </form>
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
             <ul className="mt-2 divide-y divide-line">
               {visible.map((purchase) => {
                 const editingThis = editingId === purchase.id;
@@ -592,22 +897,55 @@ function PurchaseDirectory({
           {finished.length > 0 ? (
             <div className="mt-4 border-t border-line pt-3">
               <p className="text-xs font-semibold tracking-wide text-muted uppercase">Selesai</p>
-              <ul className="mt-2 divide-y divide-line">
-                {finished.map((purchase) => (
-                  <li key={purchase.id} className="py-3">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <p className="font-medium">
-                        {purchase.no} · {purchase.distributorName}
-                      </p>
-                      <StatusMark status={purchase.status} />
-                    </div>
-                    <p className="mt-1 text-sm text-muted">
-                      {purchase.lines.map((line) => `${line.name} ×${line.qty}`).join(", ")}
-                    </p>
-                    <p className="mt-1 text-sm font-semibold tabular-nums">{rupiah(purchase.total)}</p>
-                  </li>
-                ))}
-              </ul>
+              <div className="mt-2 overflow-x-auto rounded-xl border border-line">
+                <table className="w-full min-w-[820px] border-collapse text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-line bg-chip text-xs font-semibold text-muted">
+                      <th scope="col" className="px-3 py-3 font-semibold">Nomor</th>
+                      <th scope="col" className="px-3 py-3 font-semibold">Distributor</th>
+                      <th scope="col" className="px-3 py-3 font-semibold">Barang</th>
+                      <th scope="col" className="px-3 py-3 text-center font-semibold">Jumlah</th>
+                      <th scope="col" className="px-3 py-3 text-right font-semibold">Total</th>
+                      <th scope="col" className="px-3 py-3 font-semibold">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {finished.map((purchase) => (
+                      <tr key={purchase.id} className="border-b border-line align-middle last:border-b-0">
+                        <td className="px-3 py-3.5 font-semibold whitespace-nowrap">{purchase.no}</td>
+                        <td className="px-3 py-3.5 font-medium">{purchase.distributorName}</td>
+                        <td className="px-3 py-3.5">
+                          <ul className="flex flex-col gap-2">
+                            {purchase.lines.map((line) => (
+                              <li key={line.productId} className="flex min-h-8 items-center">
+                                {line.name}
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <ul className="flex flex-col items-center gap-2">
+                            {purchase.lines.map((line) => (
+                              <li key={line.productId} className="flex min-h-8 items-center gap-2">
+                                <QtyMark qty={line.received < line.qty ? line.received : line.qty} />
+                                {line.received < line.qty ? (
+                                  <span className="text-xs font-semibold text-muted">dari {line.qty}</span>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                        <td className="px-3 py-3.5 text-right font-semibold whitespace-nowrap tabular-nums">
+                          {rupiah(purchase.total)}
+                        </td>
+                        <td className="px-3 py-3.5">
+                          <StatusMark status={purchase.status} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : null}
         </>
