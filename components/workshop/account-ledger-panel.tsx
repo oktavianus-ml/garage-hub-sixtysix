@@ -110,11 +110,11 @@ export function AccountLedgerPanel({ ledger }: { ledger: AccountLedger }) {
           </ul>
         )}
       </GlassCard>
-      <div className="mt-4 grid items-start gap-4 lg:grid-cols-3">
+      <div className="mt-4 grid items-stretch gap-4 lg:grid-cols-3">
         {ACCOUNT_KINDS.map((kind) => {
           const rows = ledger.rows.filter((row) => row.kind === kind);
           return (
-            <GlassCard key={kind} className="p-4">
+            <GlassCard key={kind} className="h-full p-4">
               <SectionTitle icon={BookOpen} tone={kind === "pendapatan" ? "amber" : "teal"}>
                 {accountKindLabel[kind]}
               </SectionTitle>
