@@ -19,6 +19,7 @@ export const ACTIVITY_ENTITIES = [
   "audit",
   "akun",
   "tutup-bulan",
+  "pengaturan",
 ] as const;
 
 export type ActivityEntity = (typeof ACTIVITY_ENTITIES)[number];
@@ -40,6 +41,7 @@ export const activityEntityLabel: Record<ActivityEntity, string> = {
   audit: "Audit budget",
   akun: "Akun (COA)",
   "tutup-bulan": "Tutup bulan",
+  pengaturan: "Pengaturan",
 };
 
 export const activityActionLabel: Record<ActivityAction, string> = {

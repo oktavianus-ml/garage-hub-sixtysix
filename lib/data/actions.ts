@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { guard } from "@/lib/auth/guard";
 import { isRole } from "@/lib/auth/roles";
@@ -10,9 +11,12 @@ import { saveBudget } from "@/lib/data/budget";
 import { asInt, isBusinessDay } from "@/lib/data/format";
 import { parsePayMethod } from "@/lib/data/payment";
 import { isSupplyUnit } from "@/lib/data/supply";
+import { isPaperWidth, isReceiptLogo } from "@/lib/data/receipt-options";
+import { saveWorkshopSettings } from "@/lib/data/settings";
 import {
   closeMonth,
   createStaff,
+  updateStaff,
   saveCashDay,
   saveCustomer,
   saveDistributor,
@@ -34,7 +38,7 @@ import {
   type SpkStatus,
 } from "@/lib/data/records";
 
-export type FormState = { message: string } | null;
+export type FormState = { message: string; ok?: boolean } | null;
 
 function fail(error: unknown): FormState {
   const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
@@ -430,15 +434,23 @@ export async function cancelPurchaseAction(_prev: FormState, formData: FormData)
 export async function saveStaffAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pegawai");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const id = String(formData.get("id") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const role = String(formData.get("role") ?? "");
-  if (name.length < 2 || !email.includes("@") || password.length < 8 || !isRole(role)) {
-    return { message: "Isi nama, email, kata sandi minimal 8 karakter, dan peran." };
+  if (name.length < 2 || !email.includes("@") || !isRole(role)) {
+    return { message: "Isi nama, email, dan peran." };
+  }
+  if ((!id && password.length < 8) || (password.length > 0 && password.length < 8)) {
+    return { message: "Kata sandi minimal 8 karakter." };
   }
   try {
-    await createStaff({ name, email, password, role }, access.user);
+    if (id) {
+      await updateStaff({ id, name, email, password: password || undefined, role }, access.user);
+    } else {
+      await createStaff({ name, email, password, role }, access.user);
+    }
   } catch (error) {
     return fail(error);
   }
@@ -650,6 +662,47 @@ export async function saveAccountAction(_prev: FormState, formData: FormData): P
     return fail(error);
   }
   redirect("/akun");
+}
+
+export async function saveWorkshopSettingsAction(
+  _prev: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const access = await guard("/pengaturan");
+  if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const name = String(formData.get("name") ?? "").trim();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const receiptFooter = String(formData.get("receiptFooter") ?? "").trim();
+  const paper = String(formData.get("paper") ?? "");
+  const logo = String(formData.get("logo") ?? "");
+  if (name.length < 2 || name.length > 80) return { message: "Isi nama bengkel." };
+  if (phone.length > 30) return { message: "Telepon terlalu panjang." };
+  if (address.length > 200) return { message: "Alamat terlalu panjang." };
+  if (receiptFooter.length > 160) return { message: "Catatan struk terlalu panjang." };
+  if (!isPaperWidth(paper)) return { message: "Pilih lebar kertas struk." };
+  if (!isReceiptLogo(logo)) return { message: "Pilih logo struk." };
+  try {
+    const changed = await saveWorkshopSettings(
+      {
+        name,
+        phone,
+        address,
+        receiptFooter,
+        showPhone: formData.get("showPhone") === "1",
+        showAddress: formData.get("showAddress") === "1",
+        showLabor: formData.get("showLabor") === "1",
+        paper,
+        logo,
+      },
+      access.user,
+    );
+    if (!changed) return { message: "Tidak ada yang berubah.", ok: true };
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/pengaturan");
+  return { message: "Pengaturan tersimpan.", ok: true };
 }
 
 export async function seedAccountsAction(_prev: FormState, _formData: FormData): Promise<FormState> {

@@ -6,12 +6,12 @@ import { listStaff } from "@/lib/data/records";
 export const metadata = { title: "Pegawai" };
 
 export default async function PegawaiPage() {
-  await guard("/pegawai");
+  const access = await guard("/pegawai");
   const staff = await listStaff();
   return (
     <div>
       <PageHeader title="Pegawai" description="Akun email pegawai dan peran yang menentukan menu." href="/pegawai" />
-      <StaffPanel staff={staff} />
+      <StaffPanel staff={staff} canWrite={access.canWrite} />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { jakartaDate } from "@/lib/data/format";
 import { formatDay, rupiahPlain, type SaleLine, type SalesReport } from "@/lib/data/sales-report";
+import type { WorkshopBrand } from "@/lib/data/settings";
 
 const PAGE_W = 841.89;
 const PAGE_H = 595.28;
@@ -185,7 +186,11 @@ function buildPdf(streams: string[]) {
   return Buffer.from(body, "latin1");
 }
 
-export function salesPdf(report: SalesReport) {
+export function salesPdf(
+  report: SalesReport,
+  brand: WorkshopBrand = { name: "GarageHub", address: "", phone: "" },
+) {
+  const contact = [brand.address, brand.phone].filter(Boolean).join(" · ");
   const printed = formatDay(jakartaDate());
   const pages: Draft[] = [];
   let page: Draft = { commands: [] };
@@ -238,7 +243,7 @@ export function salesPdf(report: SalesReport) {
     pages.push(page);
     y = PAGE_H - 36;
     if (!continued) return;
-    text(LEFT, y, "GarageHub", { size: 11, bold: true, color: AMBER });
+    text(LEFT, y, brand.name, { size: 11, bold: true, color: AMBER, maxWidth: 280 });
     text(RIGHT - 220, y, "Laporan penjualan", { size: 11, bold: true, align: "right", right: RIGHT });
     y -= 8;
     rule(y);
@@ -257,8 +262,12 @@ export function salesPdf(report: SalesReport) {
   }
 
   startPage(false);
-  text(LEFT, y, "GarageHub", { size: 16, bold: true, color: AMBER });
+  text(LEFT, y, brand.name, { size: 16, bold: true, color: AMBER, maxWidth: RIGHT - LEFT });
   y -= 18;
+  if (contact) {
+    text(LEFT, y, contact, { size: 9, color: MUTED, maxWidth: RIGHT - LEFT });
+    y -= 14;
+  }
   text(LEFT, y, "Laporan penjualan", { size: 12, bold: true });
   y -= 15;
   text(LEFT, y, report.period.label, { size: 10, color: MUTED });

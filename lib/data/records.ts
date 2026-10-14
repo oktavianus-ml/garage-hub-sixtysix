@@ -1,6 +1,6 @@
 import type { Transaction } from "firebase-admin/firestore";
 import { getAdminAuth, getAdminFirestore } from "@/lib/firebase/admin";
-import { roleLabel, type Role } from "@/lib/auth/roles";
+import { isRole, roleLabel, type Role } from "@/lib/auth/roles";
 import { canMarkPaid, canPlacePurchase } from "@/lib/auth/access";
 import {
   fieldChanges,
@@ -1331,6 +1331,66 @@ export async function createStaff(
   await batch.commit();
 }
 
+export async function updateStaff(
+  input: {
+    id: string;
+    name: string;
+    email: string;
+    password?: string;
+    role: Role;
+  },
+  actor: ActivityActor,
+) {
+  const ref = store().collection("users").doc(input.id);
+  const snap = await ref.get();
+  const data = snap.data();
+  if (!snap.exists || data?.active === false || !isRole(data?.role)) {
+    throw new Error("Pegawai tidak ditemukan.");
+  }
+  if (data.role === "pemilik" && input.role !== "pemilik") {
+    const owners = await store().collection("users").where("role", "==", "pemilik").get();
+    const activeOwners = owners.docs.filter((doc) => doc.data().active !== false);
+    if (activeOwners.length <= 1) {
+      throw new Error("Harus tetap ada satu pemilik.");
+    }
+  }
+  const before = {
+    Nama: text(data.name),
+    Email: text(data.email),
+    Peran: roleLabel[data.role],
+  };
+  const after = {
+    Nama: input.name,
+    Email: input.email,
+    Peran: roleLabel[input.role],
+  };
+  await getAdminAuth().updateUser(input.id, {
+    email: input.email,
+    displayName: input.name,
+    ...(input.password ? { password: input.password } : {}),
+  });
+  const changes: ActivityChange[] = fieldChanges(before, after);
+  if (input.password) changes.push({ field: "Kata sandi", before: "", after: "diubah" });
+  const batch = store().batch();
+  batch.update(ref, {
+    name: input.name,
+    email: input.email,
+    role: input.role,
+  });
+  queueActivity(batch, {
+    actor,
+    action: "ubah",
+    entity: "pegawai",
+    entityId: input.id,
+    label: `Data ${input.name} diubah`,
+    changes,
+  });
+  await batch.commit();
+  if (input.password && input.id !== actor.uid) {
+    await getAdminAuth().revokeRefreshTokens(input.id);
+  }
+}
+
 export async function listOrders() {
   const snap = await store().collection("serviceOrders").get();
   return snap.docs
@@ -1851,10 +1911,12 @@ export async function closeMonth(month: string, actor: ActivityActor) {
 export async function todayBoard() {
   const day = jakartaDate();
   const database = store();
-  const [ordersSnap, salesSnap, products] = await Promise.all([
+  const [ordersSnap, salesSnap, products, cashDay, splitSnap] = await Promise.all([
     database.collection("serviceOrders").where("paidDate", "==", day).get(),
     database.collection("walkInSales").where("businessDate", "==", day).get(),
     listProducts(),
+    getCashDay(day),
+    database.doc("settings/profitSplit").get(),
   ]);
   const orders = ordersSnap.docs
     .map((doc) => mapOrder(doc.id, doc.data()))
@@ -1862,17 +1924,22 @@ export async function todayBoard() {
   const sales = salesSnap.docs.map((doc) => ({
     no: text(doc.data().no),
     total: num(doc.data().total),
+    costTotal: num(doc.data().costTotal),
     lines: mapParts(doc.data().lines),
     createdAt: text(doc.data().createdAt),
   }));
   const revenue = orders.reduce((sum, order) => sum + order.grand, 0) + sales.reduce((sum, sale) => sum + sale.total, 0);
+  const labor = orders.reduce((sum, order) => sum + order.laborCost, 0);
   const partQty =
     orders.reduce((sum, order) => sum + order.parts.reduce((partSum, part) => partSum + part.qty, 0), 0) +
     sales.reduce((sum, sale) => sum + sale.lines.reduce((lineSum, line) => lineSum + line.qty, 0), 0);
   const jobs = orders.filter((order) => order.laborCost > 0).length;
-  const gross =
-    orders.reduce((sum, order) => sum + (order.grand - order.partsCost), 0) +
-    sales.reduce((sum, sale) => sum + (sale.total - sale.lines.reduce((lineSum, line) => lineSum + line.qty * line.cost, 0)), 0);
+  const cogs =
+    orders.reduce((sum, order) => sum + order.partsCost, 0) + sales.reduce((sum, sale) => sum + sale.costTotal, 0);
+  const gross = revenue - cogs;
+  const cashOut = cashDay?.cashOut ?? 0;
+  const net = gross - cashOut;
+  const shares = allocateShares(net, partnersFromRecord(splitSnap.data()));
   const lowStock = products.filter((product) => product.safetyStock > 0 && product.stock <= product.safetyStock);
   const movements = [
     ...orders.map((order) => ({
@@ -1892,9 +1959,15 @@ export async function todayBoard() {
   return {
     day,
     revenue,
+    labor,
     partQty,
     jobs,
+    cogs,
     gross,
+    cashOut,
+    net,
+    shares,
+    updatedAt: new Date().toISOString(),
     lowStock,
     movements,
     hasActivity: orders.length + sales.length + products.length > 0,

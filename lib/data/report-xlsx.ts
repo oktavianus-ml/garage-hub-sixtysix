@@ -1,5 +1,6 @@
 import { jakartaDate } from "@/lib/data/format";
 import type { SalesReport } from "@/lib/data/sales-report";
+import type { WorkshopBrand } from "@/lib/data/settings";
 
 type Cell =
   | { kind: "text"; value: string; bold?: boolean }
@@ -231,11 +232,16 @@ ${sheets
   return zipStore(files.map((file) => ({ name: file.name, data: Buffer.from(file.data, "utf8") })));
 }
 
-export function salesWorkbook(report: SalesReport) {
+export function salesWorkbook(
+  report: SalesReport,
+  brand: WorkshopBrand = { name: "GarageHub", address: "", phone: "" },
+) {
   const printed = jakartaDate();
   const summary: Cell[][] = [
     [text("Laporan penjualan", true)],
-    [text("Bengkel", true), text("GarageHub")],
+    [text("Bengkel", true), text(brand.name)],
+    ...(brand.address ? [[text("Alamat", true), text(brand.address)]] : []),
+    ...(brand.phone ? [[text("Telepon", true), text(brand.phone)]] : []),
     [text("Periode", true), text(report.period.label)],
     [text("Diunduh", true), text(printed)],
     [],
