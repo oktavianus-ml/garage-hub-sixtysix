@@ -119,7 +119,7 @@ export function StaffPanel({ staff, canWrite }: { staff: StaffUser[]; canWrite: 
               >
                 {ROLES.map((item) => (
                   <option key={item} value={item}>
-                    {roleLabel[item]}
+                    {roleLabel[item].toLocaleUpperCase("id")}
                   </option>
                 ))}
               </select>
@@ -149,35 +149,90 @@ export function StaffPanel({ staff, canWrite }: { staff: StaffUser[]; canWrite: 
         {staff.length === 0 ? (
           <p className="mt-3 text-sm text-muted">Belum ada pegawai.</p>
         ) : (
-          <ul className="mt-2 divide-y divide-line">
-            {staff.map((person) => {
-              const editingThis = editing?.id === person.id;
-              return (
-                <li key={person.id} className={cn("py-3", editingThis && "-mx-2 rounded-xl bg-teal-soft px-2")}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium">{person.name}</p>
-                      <p className="text-xs text-muted">{person.email}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <p className="text-sm font-semibold text-amber">{roleLabel[person.role]}</p>
-                      {canWrite ? (
-                        <button
-                          type="button"
-                          className="glass inline-flex h-8 items-center rounded-xl px-3.5 text-sm font-semibold leading-none text-teal"
-                          onClick={() => beginEdit(person)}
-                        >
-                          Ubah
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <TeamTable staff={staff} canWrite={canWrite} editingId={editing?.id ?? ""} onEdit={beginEdit} />
         )}
       </GlassCard>
+    </div>
+  );
+}
+
+function TeamTable({
+  staff,
+  canWrite,
+  editingId,
+  onEdit,
+}: {
+  staff: StaffUser[];
+  canWrite: boolean;
+  editingId: string;
+  onEdit: (person: StaffUser) => void;
+}) {
+  const rows = [...staff].sort((left, right) => {
+    if (left.role === "pemilik" && right.role !== "pemilik") return -1;
+    if (right.role === "pemilik" && left.role !== "pemilik") return 1;
+    return left.name.localeCompare(right.name, "id");
+  });
+
+  return (
+    <div className="mt-3 overflow-x-auto">
+      <table className="w-full min-w-[520px] border-separate border-spacing-x-0 border-spacing-y-2 text-left text-sm">
+        <thead>
+          <tr className="text-xs font-semibold text-muted">
+            <th scope="col" className="px-3 pb-1 font-semibold">
+              Nama
+            </th>
+            <th scope="col" className="px-3 pb-1 font-semibold">
+              Email
+            </th>
+            <th scope="col" className="px-3 pb-1 font-semibold">
+              Peran
+            </th>
+            {canWrite ? <th scope="col" className="px-3 pb-1 text-right font-semibold" /> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((person) => {
+            const owner = person.role === "pemilik";
+            const editingThis = editingId === person.id;
+            const cell = cn(
+              "py-3 align-middle",
+              editingThis
+                ? "border-y border-teal/40 bg-teal-soft"
+                : owner
+                  ? "border-y border-amber/35 bg-amber-soft"
+                  : "border-b border-line",
+            );
+            const edge = owner || editingThis;
+            return (
+              <tr key={person.id}>
+                <td className={cn(cell, "px-3 font-medium", edge && "rounded-l-xl border-l")}>{person.name}</td>
+                <td className={cn(cell, "px-3 text-muted")}>{person.email}</td>
+                <td className={cn(cell, "px-3", !canWrite && edge && "rounded-r-xl border-r")}>
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide",
+                      owner ? "bg-amber text-bg" : "bg-chip text-ink",
+                    )}
+                  >
+                    {roleLabel[person.role]}
+                  </span>
+                </td>
+                {canWrite ? (
+                  <td className={cn(cell, "px-3 text-right", edge && "rounded-r-xl border-r")}>
+                    <button
+                      type="button"
+                      className="glass inline-flex h-8 items-center rounded-xl px-3.5 text-sm font-semibold leading-none text-teal"
+                      onClick={() => onEdit(person)}
+                    >
+                      Ubah
+                    </button>
+                  </td>
+                ) : null}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
