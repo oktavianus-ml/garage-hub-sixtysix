@@ -21,6 +21,7 @@ import {
   saveCustomer,
   saveDistributor,
   saveProduct,
+  saveSafetyStock,
   saveProfitSplit,
   savePurchase,
   saveProcurement,
@@ -133,6 +134,25 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
     return fail(error);
   }
   redirect("/produk");
+}
+
+export async function saveSafetyStockAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const access = await guard("/inventori");
+  if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const id = String(formData.get("id") ?? "").trim();
+  const safetyStock = asInt(formData.get("safetyStock"));
+  if (!id || safetyStock === null || safetyStock > 100000) {
+    return { message: "Isi batas aman dari 0 sampai 100.000." };
+  }
+  try {
+    const changed = await saveSafetyStock(id, safetyStock, access.user);
+    if (!changed) return { message: "Tidak ada yang berubah.", ok: true };
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/inventori");
+  revalidatePath("/");
+  return { message: "Batas aman tersimpan.", ok: true };
 }
 
 export async function saveDistributorAction(_prev: FormState, formData: FormData): Promise<FormState> {

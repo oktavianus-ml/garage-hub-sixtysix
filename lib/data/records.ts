@@ -549,6 +549,35 @@ export async function saveProduct(
   await batch.commit();
 }
 
+export async function saveSafetyStock(productId: string, safetyStock: number, actor: ActivityActor) {
+  if (!productId) throw new Error("Barang tidak ditemukan.");
+  if (!Number.isInteger(safetyStock) || safetyStock < 0 || safetyStock > 100000) {
+    throw new Error("Batas aman harus angka dari 0 sampai 100.000.");
+  }
+  const ref = store().collection("products").doc(productId);
+  const existing = await ref.get();
+  if (!existing.exists) throw new Error("Barang tidak ditemukan.");
+  const before = num(existing.data()?.safetyStock);
+  if (before === safetyStock) return false;
+  const name = text(existing.data()?.name);
+  const unit = text(existing.data()?.unit, "pcs");
+  const batch = store().batch();
+  batch.update(ref, { safetyStock });
+  queueActivity(batch, {
+    actor,
+    action: "ubah",
+    entity: "produk",
+    entityId: ref.id,
+    label: `Batas aman ${name} diubah`,
+    changes: fieldChanges(
+      { "Batas aman": `${before} ${unit}` },
+      { "Batas aman": `${safetyStock} ${unit}` },
+    ),
+  });
+  await batch.commit();
+  return true;
+}
+
 export async function listDistributors() {
   const snap = await store().collection("distributors").get();
   return snap.docs
