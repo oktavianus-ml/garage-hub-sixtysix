@@ -16,7 +16,6 @@ export const STARTER_ACCOUNTS: {
   kind: AccountKind;
   note: string;
 }[] = [
-  { code: "4100", name: "Pendapatan jasa servis", kind: "pendapatan", note: "Ongkos jasa dari SPK." },
   {
     code: "4200",
     name: "Pendapatan penjualan sparepart",
@@ -25,9 +24,6 @@ export const STARTER_ACCOUNTS: {
   },
   { code: "4900", name: "Pendapatan lain-lain", kind: "pendapatan", note: "Pemasukan di luar jasa dan barang." },
   { code: "5100", name: "Harga pokok barang", kind: "beban", note: "Harga beli barang yang terjual." },
-  { code: "5200", name: "Beban gaji", kind: "beban", note: "Upah pegawai bengkel." },
-  { code: "5300", name: "Beban sewa", kind: "beban", note: "Sewa tempat." },
-  { code: "5400", name: "Beban listrik dan air", kind: "beban", note: "Listrik, air, dan internet." },
   { code: "5500", name: "Beban operasional", kind: "beban", note: "Biaya harian bengkel." },
   { code: "5900", name: "Beban lain-lain", kind: "beban", note: "Biaya yang tidak masuk kelompok di atas." },
   { code: "3100", name: "Modal pemilik", kind: "modal", note: "Setoran awal dan tambahan modal." },

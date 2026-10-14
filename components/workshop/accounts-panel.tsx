@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, List, Pencil, Search } from "lucide-react";
+import { BookOpen, Hash, List, Pencil, Search } from "lucide-react";
 import { saveAccountAction, seedAccountsAction } from "@/lib/data/actions";
 import {
   ACCOUNT_KINDS,
@@ -126,7 +126,7 @@ export function AccountsPanel({
 
       <div className={cn("mt-4 grid items-start gap-4", canWrite && "lg:grid-cols-2")}>
         {canWrite ? (
-          <div ref={formRef}>
+          <div ref={formRef} className="flex flex-col gap-4">
             <GlassCard accent={!editing} className={cn("p-4", editing && "border-t-2 border-t-teal")}>
               <div className="flex items-start justify-between gap-3">
                 <SectionTitle icon={editing ? Pencil : BookOpen} tone={editing ? "teal" : "amber"}>
@@ -142,7 +142,7 @@ export function AccountsPanel({
                     required
                     inputMode="numeric"
                     maxLength={6}
-                    placeholder="Kode, misalnya 4100"
+                    placeholder="Kode, misalnya 4200"
                     className={inputClass}
                     value={code}
                     onChange={(event) => setCode(event.target.value)}
@@ -214,6 +214,9 @@ export function AccountsPanel({
                 </div>
               </form>
             </GlassCard>
+            {accounts.length > 0 ? (
+              <KindCodes accounts={accounts} kind={kind} code={code} excludeId={editing?.id ?? ""} />
+            ) : null}
           </div>
         ) : null}
         <AccountDirectory
@@ -229,6 +232,63 @@ export function AccountsPanel({
         />
       </div>
     </>
+  );
+}
+
+function KindCodes({
+  accounts,
+  kind,
+  code,
+  excludeId,
+}: {
+  accounts: ChartAccount[];
+  kind: AccountKind;
+  code: string;
+  excludeId: string;
+}) {
+  const siblings = accounts
+    .filter((account) => account.kind === kind && account.id !== excludeId)
+    .sort((left, right) => left.code.localeCompare(right.code, "id", { numeric: true }));
+  const typed = code.trim();
+  const clash = typed
+    ? accounts.find((account) => account.id !== excludeId && account.code === typed)
+    : undefined;
+  const label = accountKindLabel[kind].toLowerCase();
+
+  return (
+    <GlassCard className="p-4">
+      <div className="flex items-center justify-between gap-3">
+        <SectionTitle icon={Hash} tone="teal">
+          Kode {label}
+        </SectionTitle>
+        <p className="text-xs font-medium text-muted">
+          {siblings.length === 0 ? "Belum ada" : `${siblings.length} akun lain`}
+        </p>
+      </div>
+      <p className={cn("mt-3 text-sm leading-6", clash ? "text-danger" : "text-muted")}>
+        {clash
+          ? `Kode ${typed} sudah dipakai ${clash.name}. Ganti sebelum menyimpan.`
+          : `Bandingkan dengan akun ${label} yang sudah ada supaya kodenya tidak dobel.`}
+      </p>
+      {siblings.length === 0 ? null : (
+        <ul className="mt-2 divide-y divide-line">
+          {siblings.map((account) => (
+            <li key={account.id} className="py-3">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p className={cn("font-medium", !account.active && "text-muted")}>{account.name}</p>
+                <span className="text-xs font-semibold tracking-wide text-muted">{account.code}</span>
+                {!account.active ? (
+                  <span className="rounded-full bg-chip px-2.5 py-1 text-[11px] font-semibold text-muted">
+                    Nonaktif
+                  </span>
+                ) : null}
+              </div>
+              {account.note ? <p className="mt-1 text-sm text-muted">{account.note}</p> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </GlassCard>
   );
 }
 
@@ -283,8 +343,8 @@ function AccountDirectory({
       {accounts.length === 0 ? (
         <div className="mt-3">
           <p className="text-sm leading-6 text-muted">
-            Belum ada akun. Daftar awal berisi jasa, penjualan sparepart, harga pokok, gaji, sewa, listrik,
-            operasional, modal pemilik, dan prive.
+            Belum ada akun. Daftar awal berisi penjualan sparepart, harga pokok, operasional,
+            modal pemilik, dan prive.
           </p>
           {canWrite ? (
             <form action={seedAction} className="mt-3">

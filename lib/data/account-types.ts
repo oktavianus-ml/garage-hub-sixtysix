@@ -8,6 +8,12 @@ export const accountKindLabel: Record<AccountKind, string> = {
   modal: "Modal",
 };
 
+export const LEDGER_CODES = {
+  partsIncome: "4200",
+  cogs: "5100",
+  operations: "5500",
+} as const;
+
 export type ChartAccount = {
   id: string;
   code: string;
@@ -24,5 +30,5 @@ export function isAccountKind(value: string): value is AccountKind {
 }
 
 export function accountCodeError(code: string) {
-  return CODE.test(code) ? "" : "Kode akun 3 sampai 6 angka, misalnya 4100.";
+  return CODE.test(code) ? "" : "Kode akun 3 sampai 6 angka, misalnya 4200.";
 }

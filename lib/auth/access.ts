@@ -99,6 +99,7 @@ export function allowedHrefs(role: Role) {
     "/bagi-hasil",
     "/audit",
     "/akun",
+    "/rekap",
     "/pegawai",
     "/riwayat",
     "/pengaturan",
