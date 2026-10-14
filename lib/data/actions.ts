@@ -72,8 +72,8 @@ export async function saveCustomerAction(_prev: FormState, formData: FormData): 
   } catch (error) {
     return fail(error);
   }
-  if (String(formData.get("id") ?? "")) redirect("/pelanggan/daftar");
-  redirect(`/pelanggan/motor?pelanggan=${encodeURIComponent(id)}`);
+  if (String(formData.get("id") ?? "")) redirect(`/pelanggan?pelanggan=${encodeURIComponent(id)}`);
+  redirect(`/pelanggan?pelanggan=${encodeURIComponent(id)}&baru=motor`);
 }
 
 export async function saveVehicleAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -104,7 +104,7 @@ export async function saveVehicleAction(_prev: FormState, formData: FormData): P
   } catch (error) {
     return fail(error);
   }
-  redirect("/pelanggan/daftar");
+  redirect(`/pelanggan?pelanggan=${encodeURIComponent(customerId)}`);
 }
 
 export async function saveProductAction(_prev: FormState, formData: FormData): Promise<FormState> {
