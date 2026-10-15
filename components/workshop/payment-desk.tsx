@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
 import { ClipboardPen, Receipt } from "lucide-react";
 import { saveCustomerPaymentAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
@@ -25,7 +26,7 @@ export function PaymentDesk({
   canWrite: boolean;
   monthClosed: boolean;
 }) {
-  const [state, action, pending] = useActionState(saveCustomerPaymentAction, null);
+  const [state, action, pending] = useQueuedAction(saveCustomerPaymentAction, "saveCustomerPayment");
 
   return (
     <div className="mt-5 grid gap-4 xl:grid-cols-2">
@@ -58,7 +59,7 @@ export function PaymentDesk({
               </select>
               <MoneyInput name="amount" required placeholder="Jumlah yang dibayar" />
               <input name="note" placeholder="Catatan, misalnya plat atau nomor SPK" className={inputClass} />
-              {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+              <FormMessage state={state} />
               <SaveButton pending={pending}>Simpan pembayaran</SaveButton>
             </form>
           )}

@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
+import { useState } from "react";
 import { Lock, Percent, PieChart, Plus, Trash2 } from "lucide-react";
 import { closeMonthAction, saveSplitAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
@@ -83,8 +85,8 @@ export function ProfitPanel({
   shares: ProfitShare[];
   people: ProfitPerson[];
 }) {
-  const [splitState, splitAction, splitPending] = useActionState(saveSplitAction, null);
-  const [closeState, closeAction, closePending] = useActionState(closeMonthAction, null);
+  const [splitState, splitAction, splitPending] = useQueuedAction(saveSplitAction, "saveSplit");
+  const [closeState, closeAction, closePending] = useQueuedAction(closeMonthAction, "closeMonth");
   const [confirmingClose, setConfirmingClose] = useState(false);
   const [drafts, setDrafts] = useState(() => draftsFrom(shares, people));
   const allowedIds = new Set(people.map((person) => person.id));
@@ -242,7 +244,7 @@ export function ProfitPanel({
                   </p>
                 ) : null}
                 {issue ? <p className="text-sm text-danger">{issue}</p> : null}
-                {splitState?.message ? <p className="text-sm text-danger">{splitState.message}</p> : null}
+                <FormMessage state={splitState} />
                 <SaveButton pending={splitPending} disabled={issue !== null}>
                   Simpan persentase
                 </SaveButton>
@@ -250,7 +252,7 @@ export function ProfitPanel({
               <form action={closeAction} className="mt-8 flex flex-col gap-3 border-t border-line pt-6">
                 <input type="hidden" name="month" value={month} />
                 {dirty ? <p className="text-sm text-muted">Simpan persentase dulu.</p> : null}
-                {closeState?.message ? <p className="text-sm text-danger">{closeState.message}</p> : null}
+                <FormMessage state={closeState} />
                 {confirmingClose ? (
                   <div className="flex flex-col gap-3">
                     <p className="text-sm">

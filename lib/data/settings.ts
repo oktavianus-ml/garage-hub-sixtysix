@@ -1,5 +1,6 @@
 import { fieldChanges, queueActivity, type ActivityActor } from "@/lib/data/activity";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { commitBatch, openBatch } from "@/lib/data/sync-receipt";
 import {
   defaultReceiptLogo,
   isPaperWidth,
@@ -110,7 +111,7 @@ export async function saveWorkshopSettings(input: WorkshopSettings, actor: Activ
   if (changes.length === 0) return false;
 
   const creating = !existing.exists;
-  const batch = database.batch();
+  const batch = openBatch();
   batch.set(ref, input);
   queueActivity(batch, {
     actor,
@@ -120,6 +121,6 @@ export async function saveWorkshopSettings(input: WorkshopSettings, actor: Activ
     label: creating ? `Profil bengkel ${input.name} dibuat` : `Pengaturan ${input.name} diubah`,
     changes,
   });
-  await batch.commit();
+  await commitBatch(batch);
   return true;
 }

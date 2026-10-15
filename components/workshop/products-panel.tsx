@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
 import { PackagePlus, Tags } from "lucide-react";
 import { saveProductAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
@@ -19,7 +20,7 @@ export function ProductsPanel({
   products: Product[];
   canWrite: boolean;
 }) {
-  const [state, action, pending] = useActionState(saveProductAction, null);
+  const [state, action, pending] = useQueuedAction(saveProductAction, "saveProduct");
 
   return (
     <div className="mt-5 grid gap-4 lg:grid-cols-2">
@@ -38,7 +39,7 @@ export function ProductsPanel({
             </select>
             <input name="cost" required inputMode="numeric" placeholder="Harga pokok" className={inputClass} />
             <input name="price" required inputMode="numeric" placeholder="Harga jual" className={inputClass} />
-            {state?.message ? <p className="text-sm text-danger sm:col-span-2">{state.message}</p> : null}
+            <FormMessage state={state} className="sm:col-span-2" />
             <SaveButton pending={pending} className="sm:col-span-2">
               Simpan produk
             </SaveButton>

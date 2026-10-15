@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
+import { useEffect, useMemo, useState } from "react";
 import { List, PackagePlus, Pencil, Search } from "lucide-react";
 import { saveSupplyItemAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
@@ -29,7 +31,7 @@ function matchesQuery(item: SupplyItem, query: string) {
 }
 
 export function SupplyItemsPanel({ items, canWrite }: { items: SupplyItem[]; canWrite: boolean }) {
-  const [state, action, pending] = useActionState(saveSupplyItemAction, null);
+  const [state, action, pending] = useQueuedAction(saveSupplyItemAction, "saveSupplyItem");
   const [editing, setEditing] = useState<SupplyItem | null>(null);
   const [name, setName] = useState("");
   const [unit, setUnit] = useState<string>("pcs");
@@ -102,7 +104,7 @@ export function SupplyItemsPanel({ items, canWrite }: { items: SupplyItem[]; can
                 onChange={(event) => setCost(event.target.value.replace(/[^\d]/g, ""))}
               />
             </div>
-            {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+            <FormMessage state={state} />
             <div className="flex gap-2">
               {editing ? (
                 <button

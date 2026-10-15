@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/shell/bottom-nav";
 import { MenuSheet } from "@/components/shell/menu-sheet";
 import { NavList } from "@/components/shell/nav-list";
 import { Topbar } from "@/components/shell/topbar";
+import { ConnectionBanner, OfflineProvider } from "@/components/shell/offline-status";
 import { type Role } from "@/lib/auth/roles";
 import { cn } from "@/lib/cn";
 
@@ -17,7 +18,7 @@ export function AdminShell({
   counts = {},
 }: {
   children: React.ReactNode;
-  user: { name: string; role: Role };
+  user: { uid: string; name: string; role: Role };
   allowedHrefs: string[];
   counts?: Record<string, number>;
 }) {
@@ -36,6 +37,7 @@ export function AdminShell({
   }, []);
 
   return (
+    <OfflineProvider uid={user.uid}>
     <div className="min-h-dvh">
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-line bg-rail xl:flex">
         <div className="flex h-16 items-center px-4">
@@ -90,7 +92,10 @@ export function AdminShell({
       </aside>
 
       <div className="md:pl-[72px] xl:pl-[248px]">
-        <Topbar user={user} allowedHrefs={allowedHrefs} />
+        <div className="sticky top-0 z-20">
+          <Topbar user={user} allowedHrefs={allowedHrefs} />
+          <ConnectionBanner />
+        </div>
         <main className="px-4 pt-4 pb-24 md:px-6 md:pt-6 md:pb-8">{children}</main>
       </div>
 
@@ -106,5 +111,6 @@ export function AdminShell({
         counts={counts}
       />
     </div>
+    </OfflineProvider>
   );
 }

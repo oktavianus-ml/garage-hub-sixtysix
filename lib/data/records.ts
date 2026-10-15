@@ -22,6 +22,7 @@ import { parsePayMethod, payMethodLabel, type PayMethod } from "@/lib/data/payme
 import { PURCHASE_STATUSES, purchaseStatusLabel, type PurchaseStatus } from "@/lib/data/purchase";
 import { isSupplyUnit } from "@/lib/data/supply";
 import { heldQty, holdDelta, type HeldPart } from "@/lib/data/stock";
+import { alreadyApplied, commitBatch, openBatch, runMutation } from "@/lib/data/sync-receipt";
 
 export type Customer = { id: string; name: string; phone: string };
 export type Vehicle = {
@@ -391,7 +392,7 @@ export async function saveCustomer(
     Telepon: text(existing?.data()?.phone),
   });
   const after = { Nama: input.name, Telepon: input.phone };
-  const batch = store().batch();
+  const batch = openBatch();
   batch.set(ref, { name: input.name, phone: input.phone }, { merge: true });
   queueActivity(batch, {
     actor,
@@ -401,7 +402,7 @@ export async function saveCustomer(
     label: existing?.exists ? `Pelanggan ${input.name} diubah` : `Pelanggan ${input.name} dibuat`,
     changes: fieldChanges(before, after),
   });
-  await batch.commit();
+  await commitBatch(batch);
   return ref.id;
 }
 
@@ -446,7 +447,7 @@ export async function saveVehicle(
     Tipe: input.bikeType,
     Tahun: String(input.year),
   };
-  const batch = store().batch();
+  const batch = openBatch();
   batch.set(
     ref,
     {
@@ -466,7 +467,7 @@ export async function saveVehicle(
     label: existing?.exists ? `Motor ${plate} diubah` : `Motor ${plate} dibuat`,
     changes: fieldChanges(before, after),
   });
-  await batch.commit();
+  await commitBatch(batch);
 }
 
 export async function listProducts() {
@@ -525,7 +526,7 @@ export async function saveProduct(
     "Harga jual": rupiah(input.price),
     ...(creating ? { Stok: "0" } : {}),
   };
-  const batch = store().batch();
+  const batch = openBatch();
   batch.set(
     ref,
     {
@@ -546,7 +547,7 @@ export async function saveProduct(
     label: creating ? `Produk ${input.name} dibuat` : `Produk ${input.name} diubah`,
     changes: fieldChanges(before, after),
   });
-  await batch.commit();
+  await commitBatch(batch);
 }
 
 export async function saveSafetyStock(productId: string, safetyStock: number, actor: ActivityActor) {
@@ -561,7 +562,7 @@ export async function saveSafetyStock(productId: string, safetyStock: number, ac
   if (before === safetyStock) return false;
   const name = text(existing.data()?.name);
   const unit = text(existing.data()?.unit, "pcs");
-  const batch = store().batch();
+  const batch = openBatch();
   batch.update(ref, { safetyStock });
   queueActivity(batch, {
     actor,
@@ -574,7 +575,7 @@ export async function saveSafetyStock(productId: string, safetyStock: number, ac
       { "Batas aman": `${safetyStock} ${unit}` },
     ),
   });
-  await batch.commit();
+  await commitBatch(batch);
   return true;
 }
 
@@ -622,7 +623,7 @@ export async function saveDistributor(
     Alamat: input.address,
     Catatan: input.note,
   };
-  const batch = store().batch();
+  const batch = openBatch();
   batch.set(
     ref,
     {
@@ -642,7 +643,7 @@ export async function saveDistributor(
     label: existing?.exists ? `Distributor ${input.name} diubah` : `Distributor ${input.name} dibuat`,
     changes: fieldChanges(before, after),
   });
-  await batch.commit();
+  await commitBatch(batch);
   return ref.id;
 }
 
@@ -761,7 +762,7 @@ export async function savePurchase(
   const merged = mergePurchaseLines(input.lines);
   const database = store();
 
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     const ref = input.id
       ? database.collection("purchases").doc(input.id)
       : database.collection("purchases").doc();
@@ -827,7 +828,7 @@ export async function placePurchase(id: string, actor: ActivityActor) {
     throw new Error("Hanya pemilik yang menyetujui permintaan.");
   }
   const database = store();
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     const ref = database.collection("purchases").doc(id);
     const snap = await tx.get(ref);
     if (!snap.exists) throw new Error("Pembelian tidak ditemukan.");
@@ -851,7 +852,7 @@ export async function placePurchase(id: string, actor: ActivityActor) {
 
 export async function cancelPurchase(id: string, actor: ActivityActor) {
   const database = store();
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     const ref = database.collection("purchases").doc(id);
     const snap = await tx.get(ref);
     if (!snap.exists) throw new Error("Pembelian tidak ditemukan.");
@@ -895,7 +896,7 @@ export async function receivePurchase(
   if (qtyByProduct.size === 0 && !closeShort) throw new Error("Isi jumlah barang yang datang.");
 
   const database = store();
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     const ref = database.collection("purchases").doc(id);
     const snap = await tx.get(ref);
     if (!snap.exists) throw new Error("Pembelian tidak ditemukan.");
@@ -1080,7 +1081,7 @@ export async function saveSupplyItem(
     throw new Error("Harga beli tidak valid.");
   }
   const database = store();
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     const ref = input.id ? database.collection("supplyItems").doc(input.id) : database.collection("supplyItems").doc();
     const existingSnap = input.id ? await tx.get(ref) : null;
     if (input.id && !existingSnap?.exists) throw new Error("Barang tidak ditemukan.");
@@ -1143,7 +1144,7 @@ export async function saveProcurement(
   if (note.length > 200) throw new Error("Catatan terlalu panjang.");
   const merged = mergeSupplyLines(input.lines);
   const database = store();
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     const ref = input.id
       ? database.collection("procurements").doc(input.id)
       : database.collection("procurements").doc();
@@ -1205,7 +1206,7 @@ export async function placeProcurement(id: string, actor: ActivityActor) {
     throw new Error("Hanya pemilik yang menyetujui permintaan.");
   }
   const database = store();
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     const ref = database.collection("procurements").doc(id);
     const snap = await tx.get(ref);
     if (!snap.exists) throw new Error("Pengadaan tidak ditemukan.");
@@ -1227,7 +1228,7 @@ export async function placeProcurement(id: string, actor: ActivityActor) {
 
 export async function cancelProcurement(id: string, actor: ActivityActor) {
   const database = store();
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     const ref = database.collection("procurements").doc(id);
     const snap = await tx.get(ref);
     if (!snap.exists) throw new Error("Pengadaan tidak ditemukan.");
@@ -1269,7 +1270,7 @@ export async function receiveProcurement(
   }
   if (qtyByItem.size === 0) throw new Error("Isi jumlah barang yang datang.");
   const database = store();
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     const ref = database.collection("procurements").doc(id);
     const snap = await tx.get(ref);
     if (!snap.exists) throw new Error("Pengadaan tidak ditemukan.");
@@ -1335,13 +1336,24 @@ export async function createStaff(
   },
   actor: ActivityActor,
 ) {
-  const created = await getAdminAuth().createUser({
-    email: input.email,
-    password: input.password,
-    displayName: input.name,
-  });
+  if (await alreadyApplied()) return;
+  let created: { uid: string };
+  try {
+    created = await getAdminAuth().createUser({
+      email: input.email,
+      password: input.password,
+      displayName: input.name,
+    });
+  } catch (error) {
+    const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+    if (code !== "auth/email-already-exists") throw error;
+    const existing = await getAdminAuth().getUserByEmail(input.email);
+    const doc = await store().collection("users").doc(existing.uid).get();
+    if (doc.exists) throw error;
+    created = existing;
+  }
   const ref = store().collection("users").doc(created.uid);
-  const batch = store().batch();
+  const batch = openBatch();
   batch.set(ref, {
     name: input.name,
     email: input.email,
@@ -1363,7 +1375,7 @@ export async function createStaff(
       },
     ),
   });
-  await batch.commit();
+  await commitBatch(batch);
 }
 
 export async function updateStaff(
@@ -1376,6 +1388,7 @@ export async function updateStaff(
   },
   actor: ActivityActor,
 ) {
+  if (await alreadyApplied()) return;
   const ref = store().collection("users").doc(input.id);
   const snap = await ref.get();
   const data = snap.data();
@@ -1406,7 +1419,7 @@ export async function updateStaff(
   });
   const changes: ActivityChange[] = fieldChanges(before, after);
   if (input.password) changes.push({ field: "Kata sandi", before: "", after: "diubah" });
-  const batch = store().batch();
+  const batch = openBatch();
   batch.update(ref, {
     name: input.name,
     email: input.email,
@@ -1420,7 +1433,7 @@ export async function updateStaff(
     label: `Data ${input.name} diubah`,
     changes,
   });
-  await batch.commit();
+  await commitBatch(batch);
   if (input.password && input.id !== actor.uid) {
     await getAdminAuth().revokeRefreshTokens(input.id);
   }
@@ -1480,7 +1493,7 @@ export async function saveServiceOrder(
     qtyByProduct.set(part.productId, (qtyByProduct.get(part.productId) ?? 0) + part.qty);
   }
 
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     const ref = input.id
       ? database.collection("serviceOrders").doc(input.id)
       : database.collection("serviceOrders").doc();
@@ -1595,7 +1608,7 @@ export async function saveCustomerPayment(
   if (!customer.exists) throw new Error("Pelanggan tidak ditemukan.");
   const customerName = text(customer.data()?.name);
   const month = monthKeyOf(input.day);
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     await ensureOpen(tx, month);
     const ref = database.collection("customerPayments").doc();
     tx.set(ref, {
@@ -1680,7 +1693,7 @@ export async function saveWalkInSale(
   const month = monthKeyOf(day);
   const database = store();
 
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     await ensureOpen(tx, month);
     const snaps = [];
     for (const productId of qtyByProduct.keys()) {
@@ -1780,7 +1793,7 @@ export async function saveCashDay(
   if (!isBusinessDay(input.day)) throw new Error("Tanggal tidak valid.");
   const month = monthKeyOf(input.day);
   const database = store();
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     await ensureOpen(tx, month);
     const ref = database.collection("cashDays").doc(input.day);
     const existing = await tx.get(ref);
@@ -1840,7 +1853,7 @@ export async function saveProfitSplit(split: ProfitSplit, actor: ActivityActor) 
   const ref = store().doc("settings/profitSplit");
   const existing = await ref.get();
   const before = priorFields(existing.exists, percentFields(partnersFromRecord(existing.data())));
-  const batch = store().batch();
+  const batch = openBatch();
   batch.set(ref, { partners });
   queueActivity(batch, {
     actor,
@@ -1850,7 +1863,7 @@ export async function saveProfitSplit(split: ProfitSplit, actor: ActivityActor) 
     label: existing.exists ? "Persentase bagi hasil diubah" : "Persentase bagi hasil dibuat",
     changes: fieldChanges(before, percentFields(partners)),
   });
-  await batch.commit();
+  await commitBatch(batch);
 }
 
 async function monthFigures(tx: Transaction, month: string) {
@@ -1903,7 +1916,7 @@ export async function previewMonth(month: string) {
 
 export async function closeMonth(month: string, actor: ActivityActor) {
   const database = store();
-  await database.runTransaction(async (tx) => {
+  await runMutation(database, async (tx) => {
     await ensureOpen(tx, month);
     const figures = await monthFigures(tx, month);
     const message = splitError(figures.partners);

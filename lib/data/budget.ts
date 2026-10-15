@@ -1,4 +1,5 @@
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { commitBatch, openBatch } from "@/lib/data/sync-receipt";
 import { fieldChanges, queueActivity, type ActivityActor } from "@/lib/data/activity";
 import type { BudgetAmounts, BudgetAudit, BudgetKey, BudgetOutflow } from "@/lib/data/budget-types";
 import { jakartaDate, monthKeyOf, rupiah } from "@/lib/data/format";
@@ -200,7 +201,7 @@ export async function saveBudget(
   const previousNote = typeof existing.data()?.note === "string" ? existing.data()?.note.trim() : "";
   const before = existing.exists ? planFields(readAmounts(existing.data()), previousNote) : {};
   const after = planFields(input.plan, note);
-  const batch = getAdminFirestore().batch();
+  const batch = openBatch();
   batch.set(ref, {
     pembelian: input.plan.pembelian,
     pengadaan: input.plan.pengadaan,
@@ -218,5 +219,5 @@ export async function saveBudget(
       : `Anggaran ${formatMonth(input.month)} disimpan`,
     changes: fieldChanges(before, after),
   });
-  await batch.commit();
+  await commitBatch(batch);
 }

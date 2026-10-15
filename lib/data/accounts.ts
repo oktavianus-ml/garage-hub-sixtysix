@@ -6,6 +6,7 @@ import {
   type ChartAccount,
 } from "@/lib/data/account-types";
 import { fieldChanges, queueActivity, type ActivityActor } from "@/lib/data/activity";
+import { alreadyApplied, commitBatch, openBatch } from "@/lib/data/sync-receipt";
 
 export type { AccountKind, ChartAccount } from "@/lib/data/account-types";
 export { ACCOUNT_KINDS, accountKindLabel, accountCodeError, isAccountKind } from "@/lib/data/account-types";
@@ -107,7 +108,7 @@ export async function saveChartAccount(
     Status: statusLabel(input.active),
   };
   const creating = !existing?.exists;
-  const batch = database.batch();
+  const batch = openBatch();
   batch.set(
     ref,
     {
@@ -127,15 +128,16 @@ export async function saveChartAccount(
     label: creating ? `Akun ${input.code} ${input.name} dibuat` : `Akun ${input.code} ${input.name} diubah`,
     changes: fieldChanges(before, after),
   });
-  await batch.commit();
+  await commitBatch(batch);
   return ref.id;
 }
 
 export async function seedChartAccounts(actor: ActivityActor) {
+  if (await alreadyApplied()) return;
   const database = getAdminFirestore();
   const current = await database.collection("accounts").limit(1).get();
   if (!current.empty) throw new Error("Daftar akun sudah ada.");
-  const batch = database.batch();
+  const batch = openBatch();
   for (const account of STARTER_ACCOUNTS) {
     batch.set(database.collection("accounts").doc(), {
       code: account.code,
@@ -157,5 +159,5 @@ export async function seedChartAccounts(actor: ActivityActor) {
       after: `${accountKindLabel[account.kind]} · ${account.name}`,
     })),
   });
-  await batch.commit();
+  await commitBatch(batch);
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
 import Link from "next/link";
 import { ArrowDownRight, Scale, Wallet } from "lucide-react";
 import { saveBudgetAction } from "@/lib/data/actions";
@@ -30,7 +31,7 @@ function MoneyRow({ label, value, warn = false }: { label: string; value: string
 }
 
 export function AuditPanel({ audit, canWrite }: { audit: BudgetAudit; canWrite: boolean }) {
-  const [state, action, pending] = useActionState(saveBudgetAction, null);
+  const [state, action, pending] = useQueuedAction(saveBudgetAction, "saveBudget");
   const leftTotal = audit.planTotal - audit.actualTotal;
   const overTotal = audit.saved && leftTotal < 0;
   const cards = [
@@ -167,7 +168,7 @@ export function AuditPanel({ audit, canWrite }: { audit: BudgetAudit; canWrite: 
                   className={areaClass}
                 />
               </label>
-              {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+              <FormMessage state={state} />
               <p className="text-sm leading-6 text-muted">
                 Isi rencana bulan ini. Nanti dibandingkan dengan barang yang diterima dan uang yang keluar dari laci.
               </p>

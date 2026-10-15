@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { useEffect, useRef, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { saveMenuAccessAction } from "@/lib/data/actions";
 import {
@@ -79,7 +80,7 @@ export function MenuAccessPanel({
   roles: Record<ConfigurableRole, string[]>;
   users: Record<string, string[]>;
 }) {
-  const [state, action, pending] = useActionState(saveMenuAccessAction, null);
+  const [state, action, pending] = useQueuedAction(saveMenuAccessAction, "saveMenuAccess");
   const [mode, setMode] = useState<"peran" | "orang">("peran");
   const [role, setRole] = useState<ConfigurableRole>("kasir");
   const people = [...staff].sort((left, right) => {

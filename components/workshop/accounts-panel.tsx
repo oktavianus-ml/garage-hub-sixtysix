@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, Hash, List, Pencil, Search } from "lucide-react";
 import { saveAccountAction, seedAccountsAction } from "@/lib/data/actions";
 import {
@@ -53,8 +55,8 @@ export function AccountsPanel({
   accounts: ChartAccount[];
   canWrite: boolean;
 }) {
-  const [state, action, pending] = useActionState(saveAccountAction, null);
-  const [seedState, seedAction, seedPending] = useActionState(seedAccountsAction, null);
+  const [state, action, pending] = useQueuedAction(saveAccountAction, "saveAccount");
+  const [seedState, seedAction, seedPending] = useQueuedAction(seedAccountsAction, "seedAccounts");
   const [editing, setEditing] = useState<ChartAccount | null>(null);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -192,7 +194,7 @@ export function AccountsPanel({
                   <option value="1">Masih dipakai</option>
                   <option value="0">Nonaktif</option>
                 </select>
-                {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+                <FormMessage state={state} />
                 <p className="text-sm leading-6 text-muted">
                   {editing
                     ? "Perubahan menimpa akun ini. Kode yang sudah dipakai tidak boleh dobel."
@@ -228,6 +230,7 @@ export function AccountsPanel({
           seedAction={seedAction}
           seedPending={seedPending}
           seedMessage={seedState?.message ?? ""}
+          seedOk={Boolean(seedState?.ok)}
           onEdit={beginEdit}
         />
       </div>
@@ -301,6 +304,7 @@ function AccountDirectory({
   seedAction,
   seedPending,
   seedMessage,
+  seedOk,
   onEdit,
 }: {
   accounts: ChartAccount[];
@@ -311,6 +315,7 @@ function AccountDirectory({
   seedAction: (payload: FormData) => void;
   seedPending: boolean;
   seedMessage: string;
+  seedOk: boolean;
   onEdit: (account: ChartAccount) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -348,7 +353,9 @@ function AccountDirectory({
           </p>
           {canWrite ? (
             <form action={seedAction} className="mt-3">
-              {seedMessage ? <p className="mb-2 text-sm text-danger">{seedMessage}</p> : null}
+              {seedMessage ? (
+                <p className={cn("mb-2 text-sm", seedOk ? "text-teal" : "text-danger")}>{seedMessage}</p>
+              ) : null}
               <SaveButton pending={seedPending}>Pakai daftar awal</SaveButton>
             </form>
           ) : null}

@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect as nextRedirect } from "next/navigation";
+import type { FormState } from "@/lib/data/form-state";
+import { readMutationId, runWithMutation } from "@/lib/data/sync-receipt";
 import { guard } from "@/lib/auth/guard";
 import { isConfigurableRole, sanitizeHrefs } from "@/lib/auth/menus";
 import { isRole } from "@/lib/auth/roles";
@@ -41,7 +43,36 @@ import {
   type SpkStatus,
 } from "@/lib/data/records";
 
-export type FormState = { message: string; ok?: boolean } | null;
+export type { FormState } from "@/lib/data/form-state";
+
+class ActionRedirect extends Error {
+  readonly path: string;
+  constructor(path: string) {
+    super("ACTION_REDIRECT");
+    this.path = path;
+  }
+}
+
+function redirect(path: string): never {
+  throw new ActionRedirect(path);
+}
+
+function isNextRedirect(error: unknown) {
+  if (typeof error !== "object" || error === null || !("digest" in error)) return false;
+  const digest = (error as { digest?: unknown }).digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
+}
+
+function expose(run: (prev: FormState, formData: FormData) => Promise<FormState>) {
+  return async (prev: FormState, formData: FormData) => {
+    try {
+      return await runWithMutation(readMutationId(formData), () => run(prev, formData));
+    } catch (error) {
+      if (error instanceof ActionRedirect) nextRedirect(error.path);
+      throw error;
+    }
+  };
+}
 
 function fail(error: unknown): FormState {
   const code = typeof error === "object" && error && "code" in error ? String(error.code) : "";
@@ -56,7 +87,7 @@ function fail(error: unknown): FormState {
   return { message: error instanceof Error ? error.message : "Gagal menyimpan." };
 }
 
-export async function saveCustomerAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveCustomerRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pelanggan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const name = String(formData.get("name") ?? "").trim();
@@ -79,7 +110,7 @@ export async function saveCustomerAction(_prev: FormState, formData: FormData): 
   redirect(`/pelanggan?pelanggan=${encodeURIComponent(id)}&baru=motor`);
 }
 
-export async function saveVehicleAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveVehicleRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pelanggan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const year = asInt(formData.get("year"));
@@ -110,7 +141,7 @@ export async function saveVehicleAction(_prev: FormState, formData: FormData): P
   redirect(`/pelanggan?pelanggan=${encodeURIComponent(customerId)}`);
 }
 
-export async function saveProductAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveProductRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/produk");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const code = String(formData.get("code") ?? "").trim();
@@ -138,7 +169,7 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
   redirect("/produk");
 }
 
-export async function saveSafetyStockAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveSafetyStockRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/inventori");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "").trim();
@@ -157,7 +188,7 @@ export async function saveSafetyStockAction(_prev: FormState, formData: FormData
   return { message: "Batas aman tersimpan.", ok: true };
 }
 
-export async function saveDistributorAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveDistributorRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/distributor");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const name = String(formData.get("name") ?? "").trim();
@@ -301,7 +332,7 @@ function readSupplyReceiveLines(raw: FormDataEntryValue | null) {
   return lines;
 }
 
-export async function saveSupplyItemAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveSupplyItemRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pengadaan/barang");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const name = String(formData.get("name") ?? "").trim();
@@ -321,7 +352,7 @@ export async function saveSupplyItemAction(_prev: FormState, formData: FormData)
   redirect("/pengadaan/barang");
 }
 
-export async function saveProcurementAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveProcurementRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pengadaan/permintaan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const vendor = String(formData.get("vendor") ?? "").trim();
@@ -346,7 +377,7 @@ export async function saveProcurementAction(_prev: FormState, formData: FormData
   redirect("/pengadaan/permintaan");
 }
 
-export async function placeProcurementAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function placeProcurementRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pengadaan/persetujuan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "");
@@ -359,7 +390,7 @@ export async function placeProcurementAction(_prev: FormState, formData: FormDat
   redirect(procurementPath(formData));
 }
 
-export async function receiveProcurementAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function receiveProcurementRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pengadaan/penerimaan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "");
@@ -374,7 +405,7 @@ export async function receiveProcurementAction(_prev: FormState, formData: FormD
   redirect(procurementPath(formData));
 }
 
-export async function cancelProcurementAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function cancelProcurementRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard(procurementPath(formData));
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "");
@@ -387,7 +418,7 @@ export async function cancelProcurementAction(_prev: FormState, formData: FormDa
   redirect(procurementPath(formData));
 }
 
-export async function savePurchaseAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function savePurchaseRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pembelian/permintaan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const distributorId = String(formData.get("distributorId") ?? "");
@@ -412,7 +443,7 @@ export async function savePurchaseAction(_prev: FormState, formData: FormData): 
   redirect("/pembelian");
 }
 
-export async function placePurchaseAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function placePurchaseRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pembelian/persetujuan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "");
@@ -425,7 +456,7 @@ export async function placePurchaseAction(_prev: FormState, formData: FormData):
   redirect("/pembelian");
 }
 
-export async function receivePurchaseAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function receivePurchaseRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pembelian/penerimaan");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "");
@@ -441,7 +472,7 @@ export async function receivePurchaseAction(_prev: FormState, formData: FormData
   redirect("/pembelian");
 }
 
-export async function cancelPurchaseAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function cancelPurchaseRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const stage = String(formData.get("stage") ?? "");
   const href =
     stage === "permintaan" || stage === "persetujuan" || stage === "penerimaan"
@@ -459,7 +490,7 @@ export async function cancelPurchaseAction(_prev: FormState, formData: FormData)
   redirect("/pembelian");
 }
 
-export async function saveStaffAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveStaffRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pegawai");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const id = String(formData.get("id") ?? "").trim();
@@ -485,7 +516,7 @@ export async function saveStaffAction(_prev: FormState, formData: FormData): Pro
   redirect("/pegawai");
 }
 
-export async function saveServiceAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveServiceRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/service");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const laborCost = asInt(formData.get("laborCost"));
@@ -521,7 +552,7 @@ export async function saveServiceAction(_prev: FormState, formData: FormData): P
   redirect("/service");
 }
 
-export async function saveSaleAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveSaleRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/kasir");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   let lines: { productId: string; qty: number }[] = [];
@@ -539,7 +570,7 @@ export async function saveSaleAction(_prev: FormState, formData: FormData): Prom
   redirect("/kasir");
 }
 
-export async function saveCustomerPaymentAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveCustomerPaymentRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/pembayaran/catat");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const day = String(formData.get("day") ?? "");
@@ -574,7 +605,7 @@ function optionalMoney(value: FormDataEntryValue | null) {
   return number === null ? ("bad" as const) : number;
 }
 
-export async function saveCashAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveCashRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/kas");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const day = String(formData.get("day") ?? "");
@@ -605,7 +636,7 @@ export async function saveCashAction(_prev: FormState, formData: FormData): Prom
   redirect(`/kas?hari=${day}`);
 }
 
-export async function saveSplitAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveSplitRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/bagi-hasil");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const ids = formData.getAll("partnerId");
@@ -626,7 +657,7 @@ export async function saveSplitAction(_prev: FormState, formData: FormData): Pro
   redirect(`/bagi-hasil?bulan=${String(formData.get("month") ?? "")}`);
 }
 
-export async function closeMonthAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function closeMonthRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/bagi-hasil");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const month = String(formData.get("month") ?? "");
@@ -639,7 +670,7 @@ export async function closeMonthAction(_prev: FormState, formData: FormData): Pr
   redirect(`/bagi-hasil?bulan=${month}`);
 }
 
-export async function saveBudgetAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveBudgetRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/audit");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const month = String(formData.get("month") ?? "");
@@ -665,7 +696,7 @@ export async function saveBudgetAction(_prev: FormState, formData: FormData): Pr
   redirect(`/audit?bulan=${month}`);
 }
 
-export async function saveAccountAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveAccountRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/akun");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const code = String(formData.get("code") ?? "").trim();
@@ -696,7 +727,7 @@ export async function saveAccountAction(_prev: FormState, formData: FormData): P
   redirect("/akun");
 }
 
-export async function saveWorkshopSettingsAction(
+async function saveWorkshopSettingsRun(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
@@ -747,7 +778,7 @@ function readHrefs(raw: FormDataEntryValue | null) {
   }
 }
 
-export async function saveMenuAccessAction(_prev: FormState, formData: FormData): Promise<FormState> {
+async function saveMenuAccessRun(_prev: FormState, formData: FormData): Promise<FormState> {
   const access = await guard("/akses-menu");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   const intent = String(formData.get("intent") ?? "");
@@ -785,7 +816,7 @@ export async function saveMenuAccessAction(_prev: FormState, formData: FormData)
   return { message: intent === "reset" ? "Orang ini kembali ikut peran." : "Akses menu tersimpan.", ok: true };
 }
 
-export async function seedAccountsAction(_prev: FormState, _formData: FormData): Promise<FormState> {
+async function seedAccountsRun(_prev: FormState, _formData: FormData): Promise<FormState> {
   const access = await guard("/akun");
   if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
   try {
@@ -794,4 +825,85 @@ export async function seedAccountsAction(_prev: FormState, _formData: FormData):
     return fail(error);
   }
   redirect("/akun");
+}
+
+const runners: Record<string, (prev: FormState, formData: FormData) => Promise<FormState>> = {
+  saveCustomer: saveCustomerRun,
+  saveVehicle: saveVehicleRun,
+  saveProduct: saveProductRun,
+  saveSafetyStock: saveSafetyStockRun,
+  saveDistributor: saveDistributorRun,
+  saveSupplyItem: saveSupplyItemRun,
+  saveProcurement: saveProcurementRun,
+  placeProcurement: placeProcurementRun,
+  receiveProcurement: receiveProcurementRun,
+  cancelProcurement: cancelProcurementRun,
+  savePurchase: savePurchaseRun,
+  placePurchase: placePurchaseRun,
+  receivePurchase: receivePurchaseRun,
+  cancelPurchase: cancelPurchaseRun,
+  saveStaff: saveStaffRun,
+  saveService: saveServiceRun,
+  saveSale: saveSaleRun,
+  saveCustomerPayment: saveCustomerPaymentRun,
+  saveCash: saveCashRun,
+  saveSplit: saveSplitRun,
+  closeMonth: closeMonthRun,
+  saveBudget: saveBudgetRun,
+  saveAccount: saveAccountRun,
+  saveWorkshopSettings: saveWorkshopSettingsRun,
+  saveMenuAccess: saveMenuAccessRun,
+  seedAccounts: seedAccountsRun,
+};
+
+export const saveCustomerAction = expose(saveCustomerRun);
+export const saveVehicleAction = expose(saveVehicleRun);
+export const saveProductAction = expose(saveProductRun);
+export const saveSafetyStockAction = expose(saveSafetyStockRun);
+export const saveDistributorAction = expose(saveDistributorRun);
+export const saveSupplyItemAction = expose(saveSupplyItemRun);
+export const saveProcurementAction = expose(saveProcurementRun);
+export const placeProcurementAction = expose(placeProcurementRun);
+export const receiveProcurementAction = expose(receiveProcurementRun);
+export const cancelProcurementAction = expose(cancelProcurementRun);
+export const savePurchaseAction = expose(savePurchaseRun);
+export const placePurchaseAction = expose(placePurchaseRun);
+export const receivePurchaseAction = expose(receivePurchaseRun);
+export const cancelPurchaseAction = expose(cancelPurchaseRun);
+export const saveStaffAction = expose(saveStaffRun);
+export const saveServiceAction = expose(saveServiceRun);
+export const saveSaleAction = expose(saveSaleRun);
+export const saveCustomerPaymentAction = expose(saveCustomerPaymentRun);
+export const saveCashAction = expose(saveCashRun);
+export const saveSplitAction = expose(saveSplitRun);
+export const closeMonthAction = expose(closeMonthRun);
+export const saveBudgetAction = expose(saveBudgetRun);
+export const saveAccountAction = expose(saveAccountRun);
+export const saveWorkshopSettingsAction = expose(saveWorkshopSettingsRun);
+export const saveMenuAccessAction = expose(saveMenuAccessRun);
+export const seedAccountsAction = expose(seedAccountsRun);
+
+export async function replayQueuedAction(
+  actionName: string,
+  fields: [string, string][],
+  mutationId: string,
+): Promise<FormState> {
+  const run = runners[actionName];
+  if (!run) return { message: "Data antrean tidak dikenal." };
+  const formData = new FormData();
+  for (const [key, value] of fields) formData.append(key, value);
+  formData.set("_mutationId", mutationId);
+  try {
+    const state = await runWithMutation(mutationId, () => run(null, formData));
+    if (state && !state.ok) return state;
+    revalidatePath("/", "layout");
+    return state ?? { ok: true, message: "Masuk." };
+  } catch (error) {
+    if (error instanceof ActionRedirect) {
+      revalidatePath("/", "layout");
+      return { ok: true, message: "Masuk." };
+    }
+    if (isNextRedirect(error)) return { message: "Masuk lagi untuk mengirim data yang tertahan." };
+    return fail(error);
+  }
 }

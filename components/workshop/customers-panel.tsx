@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Bike, List, Pencil, Search, UserPlus } from "lucide-react";
 import { saveCustomerAction, saveVehicleAction } from "@/lib/data/actions";
@@ -229,7 +231,7 @@ function CustomerDetail({
 }
 
 function CustomerForm({ customer, canWrite }: { customer: Customer | null; canWrite: boolean }) {
-  const [state, action, pending] = useActionState(saveCustomerAction, null);
+  const [state, action, pending] = useQueuedAction(saveCustomerAction, "saveCustomer");
   const [name, setName] = useState(customer?.name ?? "");
   const [phone, setPhone] = useState(nationalDigits(customer?.phone ?? ""));
   const cancelHref = customer ? customerHref(customer.id) : "/pelanggan";
@@ -266,7 +268,7 @@ function CustomerForm({ customer, canWrite }: { customer: Customer | null; canWr
             />
             <input type="hidden" name="phone" value={phone ? `+62${phone}` : ""} />
           </label>
-          {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+          <FormMessage state={state} />
           <p className="text-sm leading-6 text-muted">
             {customer
               ? "Perubahan menimpa nama dan telepon pelanggan ini."
@@ -307,7 +309,7 @@ function VehicleForm({
   canWrite: boolean;
 }) {
   const choices = vehicle ? vehicleChoices(vehicle) : null;
-  const [state, action, pending] = useActionState(saveVehicleAction, null);
+  const [state, action, pending] = useQueuedAction(saveVehicleAction, "saveVehicle");
   const [customerId, setCustomerId] = useState(vehicle?.customerId || selectedCustomerId);
   const [plate, setPlate] = useState(vehicle?.plate ?? "");
   const [brandChoice, setBrandChoice] = useState(choices?.brandChoice ?? "");
@@ -450,7 +452,7 @@ function VehicleForm({
               </option>
             ))}
           </select>
-          {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+          <FormMessage state={state} />
           <p className="text-sm leading-6 text-muted">
             {vehicle
               ? "Hanya motor ini yang berubah. Motor lain tetap seperti semula."

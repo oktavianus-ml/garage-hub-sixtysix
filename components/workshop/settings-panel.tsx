@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState, useSyncExternalStore } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Moon, Receipt, Store, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { saveWorkshopSettingsAction } from "@/lib/data/actions";
@@ -249,7 +250,7 @@ export function SettingsPanel({
   settings: WorkshopSettings;
   canWrite: boolean;
 }) {
-  const [state, action, pending] = useActionState(saveWorkshopSettingsAction, null);
+  const [state, action, pending] = useQueuedAction(saveWorkshopSettingsAction, "saveWorkshopSettings");
   const [name, setName] = useState(settings.name);
   const [phone, setPhone] = useState(settings.phone);
   const [address, setAddress] = useState(settings.address);

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
 
-const PUBLIC_PREFIXES = ["/login", "/setup", "/api/session", "/api/firebase-status"];
+const PUBLIC_PREFIXES = ["/login", "/setup", "/api/session", "/api/firebase-status", "/api/ping"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

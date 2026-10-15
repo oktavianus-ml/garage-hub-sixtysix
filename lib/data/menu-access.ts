@@ -1,5 +1,6 @@
 import { fieldChanges, queueActivity, type ActivityActor } from "@/lib/data/activity";
 import { getAdminFirestore } from "@/lib/firebase/admin";
+import { commitBatch, openBatch } from "@/lib/data/sync-receipt";
 import {
   CONFIGURABLE_ROLES,
   configurableHrefs,
@@ -83,7 +84,7 @@ async function writeStore(store: MenuAccessStore, actor: ActivityActor, label: s
   const changes = [...extra, ...fieldChanges(tracked(before), tracked(after))];
   if (changes.length === 0) return false;
   const database = getAdminFirestore();
-  const batch = database.batch();
+  const batch = openBatch();
   batch.set(database.doc(DOC), store);
   queueActivity(batch, {
     actor,
@@ -93,7 +94,7 @@ async function writeStore(store: MenuAccessStore, actor: ActivityActor, label: s
     label,
     changes,
   });
-  await batch.commit();
+  await commitBatch(batch);
   return true;
 }
 

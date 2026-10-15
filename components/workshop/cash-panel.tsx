@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useState, type ReactNode } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
+import { useState, type ReactNode } from "react";
 import { Lock, Receipt, Wallet } from "lucide-react";
 import { saveCashAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
@@ -54,7 +56,7 @@ export function CashPanel({
   canWrite: boolean;
   monthClosed: boolean;
 }) {
-  const [state, action, pending] = useActionState(saveCashAction, null);
+  const [state, action, pending] = useQueuedAction(saveCashAction, "saveCash");
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(payments.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount - 1);
@@ -165,7 +167,7 @@ export function CashPanel({
               <Field label="Catatan">
                 <input name="note" placeholder="Opsional" defaultValue={saved?.note ?? ""} className={inputClass} />
               </Field>
-              {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+              <FormMessage state={state} />
               <SaveButton pending={pending}>Simpan</SaveButton>
             </form>
           )}

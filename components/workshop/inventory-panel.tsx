@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { useMemo, useState } from "react";
 import { Search, Warehouse } from "lucide-react";
 import { saveSafetyStockAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
@@ -52,7 +53,7 @@ function matchesQuery(product: Product, query: string) {
 }
 
 function SafetyStockField({ product }: { product: Product }) {
-  const [state, action, pending] = useActionState(saveSafetyStockAction, null);
+  const [state, action, pending] = useQueuedAction(saveSafetyStockAction, "saveSafetyStock");
   return (
     <form action={action} className="flex flex-wrap items-center gap-1.5">
       <input type="hidden" name="id" value={product.id} />

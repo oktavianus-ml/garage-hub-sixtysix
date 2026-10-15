@@ -1,6 +1,8 @@
 "use client";
 
-import { Fragment, useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ClipboardList, List, Pencil, Search } from "lucide-react";
 import {
@@ -119,7 +121,7 @@ export function PurchasesPanel({
   canWrite: boolean;
   canOrder: boolean;
 }) {
-  const [state, action, pending] = useActionState(savePurchaseAction, null);
+  const [state, action, pending] = useQueuedAction(savePurchaseAction, "savePurchase");
   const [editing, setEditing] = useState<Purchase | null>(null);
   const [distributorId, setDistributorId] = useState("");
   const [note, setNote] = useState("");
@@ -316,7 +318,7 @@ export function PurchasesPanel({
                   onChange={(event) => setNote(event.target.value)}
                 />
                 <p className="text-lg font-semibold tabular-nums">{rupiah(total)}</p>
-                {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+                <FormMessage state={state} />
                 <p className="text-sm leading-6 text-muted">
                   Permintaan ini belum dipesan. Angka di menu Persetujuan bertambah sampai pemilik menyetujuinya.
                 </p>
@@ -366,9 +368,9 @@ function PurchaseDirectory({
   editingId: string;
   onEdit: (purchase: Purchase) => void;
 }) {
-  const [placeState, placeAction, placePending] = useActionState(placePurchaseAction, null);
-  const [receiveState, receiveAction, receivePending] = useActionState(receivePurchaseAction, null);
-  const [cancelState, cancelAction, cancelPending] = useActionState(cancelPurchaseAction, null);
+  const [placeState, placeAction, placePending] = useQueuedAction(placePurchaseAction, "placePurchase");
+  const [receiveState, receiveAction, receivePending] = useQueuedAction(receivePurchaseAction, "receivePurchase");
+  const [cancelState, cancelAction, cancelPending] = useQueuedAction(cancelPurchaseAction, "cancelPurchase");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
   const [receivingId, setReceivingId] = useState("");
@@ -404,7 +406,7 @@ function PurchaseDirectory({
   const visible = filtered.slice(start, start + PAGE_SIZE);
   const rangeStart = filtered.length === 0 ? 0 : start + 1;
   const rangeEnd = start + visible.length;
-  const notice = receiveState?.message ?? placeState?.message ?? cancelState?.message;
+  const notice = [receiveState, placeState, cancelState].find((item) => item?.message) ?? null;
 
   function beginReceive(purchase: Purchase) {
     const qty: Record<string, number> = {};
@@ -444,7 +446,9 @@ function PurchaseDirectory({
               className={cn(inputClass, "pl-10")}
             />
           </label>
-          {notice ? <p className="mt-3 text-sm text-danger">{notice}</p> : null}
+          {notice?.message ? (
+            <p className={cn("mt-3 text-sm", notice.ok ? "text-teal" : "text-danger")}>{notice.message}</p>
+          ) : null}
           {stage === "persetujuan" && !canOrder && visible.length > 0 ? (
             <p className="mt-3 text-sm text-muted">Menunggu pemilik menyetujui.</p>
           ) : null}

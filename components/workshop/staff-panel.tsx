@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
+import { useEffect, useRef, useState } from "react";
 import { Pencil, UserPlus, Users } from "lucide-react";
 import { saveStaffAction } from "@/lib/data/actions";
 import { ROLES, isRole, roleLabel, type Role } from "@/lib/auth/roles";
@@ -26,7 +28,7 @@ function RecordMark({ kind }: { kind: "baru" | "revisi" }) {
 }
 
 export function StaffPanel({ staff, canWrite }: { staff: StaffUser[]; canWrite: boolean }) {
-  const [state, action, pending] = useActionState(saveStaffAction, null);
+  const [state, action, pending] = useQueuedAction(saveStaffAction, "saveStaff");
   const [editing, setEditing] = useState<StaffUser | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -123,7 +125,7 @@ export function StaffPanel({ staff, canWrite }: { staff: StaffUser[]; canWrite: 
                   </option>
                 ))}
               </select>
-              {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+              <FormMessage state={state} />
               <div className="flex gap-2">
                 {editing ? (
                   <button

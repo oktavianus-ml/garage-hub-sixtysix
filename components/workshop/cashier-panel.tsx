@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, useActionState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
+import { useMemo, useState } from "react";
 import { Receipt, ShoppingBag } from "lucide-react";
 import { saveSaleAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
@@ -20,7 +22,7 @@ export function CashierPanel({
   sales: WalkInSale[];
   canWrite: boolean;
 }) {
-  const [state, action, pending] = useActionState(saveSaleAction, null);
+  const [state, action, pending] = useQueuedAction(saveSaleAction, "saveSale");
   const [lines, setLines] = useState<{ productId: string; qty: number }[]>([]);
   const total = useMemo(
     () =>
@@ -101,7 +103,7 @@ export function CashierPanel({
               ))}
             </select>
             <p className="text-lg font-semibold tabular-nums">{rupiah(total)}</p>
-            {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+            <FormMessage state={state} />
             <SaveButton pending={pending} disabled={lines.length === 0}>
               Simpan penjualan
             </SaveButton>

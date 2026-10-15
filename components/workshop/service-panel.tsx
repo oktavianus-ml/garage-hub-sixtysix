@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState, useActionState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
+import { useMemo, useState } from "react";
 import { ClipboardList, Wrench } from "lucide-react";
 import { saveServiceAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
@@ -48,7 +50,7 @@ export function ServicePanel({
   canPay: boolean;
   editing: ServiceOrder | null;
 }) {
-  const [state, action, pending] = useActionState(saveServiceAction, null);
+  const [state, action, pending] = useQueuedAction(saveServiceAction, "saveService");
   const [customerId, setCustomerId] = useState(editing?.customerId ?? "");
   const [status, setStatus] = useState<SpkStatus>(editing?.status ?? "antri");
   const [parts, setParts] = useState(editing?.parts.map((part) => ({ productId: part.productId, qty: part.qty })) ?? []);
@@ -269,7 +271,7 @@ export function ServicePanel({
                 })}
               </ul>
               <p className="text-sm text-muted">Perkiraan part {rupiah(total)} ditambah ongkos jasa.</p>
-              {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+              <FormMessage state={state} />
               <SaveButton pending={pending} disabled={mechanics.length === 0}>
                 Simpan SPK
               </SaveButton>

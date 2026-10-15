@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useQueuedAction } from "@/components/shell/offline-status";
+import { FormMessage } from "@/components/ui/form-message";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { List, Pencil, Search, Truck } from "lucide-react";
 import { saveDistributorAction } from "@/lib/data/actions";
 import type { Distributor } from "@/lib/data/records";
@@ -54,7 +56,7 @@ export function DistributorsPanel({
   distributors: Distributor[];
   canWrite: boolean;
 }) {
-  const [state, action, pending] = useActionState(saveDistributorAction, null);
+  const [state, action, pending] = useQueuedAction(saveDistributorAction, "saveDistributor");
   const [editing, setEditing] = useState<Distributor | null>(null);
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
@@ -150,7 +152,7 @@ export function DistributorsPanel({
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
               />
-              {state?.message ? <p className="text-sm text-danger">{state.message}</p> : null}
+              <FormMessage state={state} />
               <p className="text-sm leading-6 text-muted">
                 {editing
                   ? "Perubahan menimpa data distributor ini."
