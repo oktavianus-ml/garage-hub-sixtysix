@@ -101,6 +101,31 @@ body {
   .hover-wash:hover {
     background: color-mix(in srgb, var(--ink) 6%, transparent);
   }
+
+  .soft-poly {
+    background-color: var(--bg-elevated);
+    background-image:
+      radial-gradient(circle at 24% 28%, color-mix(in srgb, var(--amber) 36%, transparent), transparent 62%),
+      radial-gradient(circle at 78% 74%, color-mix(in srgb, var(--teal) 26%, transparent), transparent 64%);
+    background-size: 150% 150%;
+    animation: soft-poly-shift 12s ease-in-out infinite;
+  }
+
+  @keyframes soft-poly-shift {
+    0%,
+    100% {
+      background-position: 0% 0%;
+    }
+    50% {
+      background-position: 100% 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .soft-poly {
+      animation: none;
+    }
+  }
 }
 
 :focus-visible {

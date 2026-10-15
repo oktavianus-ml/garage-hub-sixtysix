@@ -30,7 +30,7 @@ export function FullscreenButton() {
   return (
     <button
       type="button"
-      className="inline-flex size-11 items-center justify-center rounded-xl border border-line bg-elevated text-ink"
+      className="soft-poly inline-flex size-11 items-center justify-center rounded-xl border border-line text-ink"
       aria-label={active ? "Keluar dari layar penuh" : "Layar penuh"}
       aria-pressed={active}
       onClick={toggle}
