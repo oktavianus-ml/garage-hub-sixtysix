@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { FullscreenButton } from "@/components/shell/fullscreen-button";
 import { LogoutButton } from "@/components/shell/logout-button";
 import { SearchBox } from "@/components/shell/search-box";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
@@ -31,6 +32,7 @@ export function Topbar({
           </p>
           <SearchBox enabled={canSearch} />
           <div className="ml-auto flex items-center gap-2">
+            <FullscreenButton />
             <ThemeToggle />
             <div className="hidden items-center gap-2 rounded-full border border-line bg-chip py-1 pr-3 pl-1 sm:flex">
               <span className="flex size-8 items-center justify-center rounded-full bg-amber-soft text-xs font-bold text-amber">
