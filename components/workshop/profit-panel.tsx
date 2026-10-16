@@ -2,7 +2,8 @@
 
 import { useQueuedAction } from "@/components/shell/offline-status";
 import { FormMessage } from "@/components/ui/form-message";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Lock, Percent, PieChart, Plus, Trash2 } from "lucide-react";
 import { closeMonthAction, saveSplitAction } from "@/lib/data/actions";
 import { rupiah } from "@/lib/data/format";
@@ -20,8 +21,29 @@ import { SaveButton } from "@/components/ui/save-button";
 import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
 
+const MONTHS = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
+
 type ProfitPerson = { id: string; name: string; role: string };
 type Draft = { key: string; userId: string; name: string; percent: string };
+
+function monthTitle(key: string) {
+  const [year, month] = key.split("-");
+  const name = MONTHS[Number(month) - 1];
+  return name && year ? `${name} ${year}` : key;
+}
 
 function personLabel(person: ProfitPerson) {
   const role = isRole(person.role) ? roleLabel[person.role] : "";
@@ -88,6 +110,7 @@ export function ProfitPanel({
   const [splitState, splitAction, splitPending] = useQueuedAction(saveSplitAction, "saveSplit");
   const [closeState, closeAction, closePending] = useQueuedAction(closeMonthAction, "closeMonth");
   const [confirmingClose, setConfirmingClose] = useState(false);
+  const cancelCloseRef = useRef<HTMLButtonElement>(null);
   const [drafts, setDrafts] = useState(() => draftsFrom(shares, people));
   const allowedIds = new Set(people.map((person) => person.id));
   const editing = canWrite && !closed;
@@ -130,6 +153,16 @@ export function ProfitPanel({
     { key: "profit", label: "Laba", value: profit },
     ...shareRows,
   ];
+
+  useEffect(() => {
+    if (!confirmingClose) return;
+    cancelCloseRef.current?.focus();
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape" && !closePending) setConfirmingClose(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirmingClose, closePending]);
 
   function changeDraft(key: string, patch: Partial<Draft>) {
     setDrafts((current) => current.map((draft) => (draft.key === key ? { ...draft, ...patch } : draft)));
@@ -249,39 +282,68 @@ export function ProfitPanel({
                   Simpan persentase
                 </SaveButton>
               </form>
-              <form action={closeAction} className="mt-8 flex flex-col gap-3 border-t border-line pt-6">
+              <form id="close-month" action={closeAction} className="mt-8 flex flex-col gap-3 border-t border-line pt-6">
                 <input type="hidden" name="month" value={month} />
                 {dirty ? <p className="text-sm text-muted">Simpan persentase dulu.</p> : null}
-                <FormMessage state={closeState} />
-                {confirmingClose ? (
-                  <div className="flex flex-col gap-3">
-                    <p className="text-sm">
-                      Tutup buku {month}? Angka bulan ini dikunci dan tidak bisa diubah lagi.
-                    </p>
-                    <div className="flex flex-col gap-3">
+                <button
+                  type="button"
+                  className={`${buttonClass} w-full`}
+                  disabled={dirty || closePending}
+                  onClick={() => setConfirmingClose(true)}
+                >
+                  Tutup buku bulan ini
+                </button>
+              </form>
+              {confirmingClose
+                ? createPortal(
+                    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
                       <button
                         type="button"
-                        className="inline-flex h-11 items-center justify-center rounded-xl border border-line-strong px-4 text-sm font-semibold"
+                        aria-label="Batalkan tutup buku"
+                        className="absolute inset-0 bg-black/45"
+                        disabled={closePending}
                         onClick={() => setConfirmingClose(false)}
+                      />
+                      <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="close-book-title"
+                        className="glass relative z-10 w-full max-w-md rounded-2xl p-4"
                       >
-                        Batal
-                      </button>
-                      <SaveButton pending={closePending} disabled={dirty} className="w-full">
-                        Ya, tutup buku
-                      </SaveButton>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className={`${buttonClass} w-full`}
-                    disabled={dirty}
-                    onClick={() => setConfirmingClose(true)}
-                  >
-                    Tutup buku bulan ini
-                  </button>
-                )}
-              </form>
+                        <p id="close-book-title" className="text-base font-semibold">
+                          Tutup buku {monthTitle(month)}?
+                        </p>
+                        <p className="mt-1 text-sm text-muted">
+                          Angka bulan ini dikunci dan tidak bisa diubah lagi.
+                        </p>
+                        <dl className="mt-3 divide-y divide-line">
+                          {rows.map((row) => (
+                            <div key={row.key} className="flex items-center justify-between gap-3 py-2 text-sm">
+                              <dt className="text-muted">{row.label}</dt>
+                              <dd className="font-semibold tabular-nums">{rupiah(row.value)}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                        <FormMessage state={closeState} />
+                        <div className="mt-4 flex flex-col gap-3">
+                          <button
+                            ref={cancelCloseRef}
+                            type="button"
+                            className="inline-flex h-11 items-center justify-center rounded-xl border border-line-strong px-4 text-sm font-semibold"
+                            disabled={closePending}
+                            onClick={() => setConfirmingClose(false)}
+                          >
+                            Batal
+                          </button>
+                          <SaveButton form="close-month" pending={closePending} disabled={dirty} className="w-full">
+                            Ya, tutup buku
+                          </SaveButton>
+                        </div>
+                      </div>
+                    </div>,
+                    document.body,
+                  )
+                : null}
             </>
           )}
         </GlassCard>

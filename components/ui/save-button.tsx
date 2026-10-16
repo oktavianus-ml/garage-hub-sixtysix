@@ -10,6 +10,7 @@ export function SaveButton({
   className,
   name,
   value,
+  form,
 }: {
   pending: boolean;
   disabled?: boolean;
@@ -18,12 +19,14 @@ export function SaveButton({
   className?: string;
   name?: string;
   value?: string;
+  form?: string;
 }) {
   return (
     <button
       type="submit"
       name={name}
       value={value}
+      form={form}
       className={cn(buttonClass, "inline-flex items-center justify-center gap-2", className)}
       disabled={disabled || pending}
       aria-busy={pending}
