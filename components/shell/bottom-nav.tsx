@@ -34,7 +34,7 @@ export function BottomNav({
   return (
     <nav
       aria-label="Menu singkat"
-      className="glass glass-chrome fixed inset-x-0 bottom-0 z-30 rounded-none border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="glass glass-chrome rounded-none border-x-0 border-t-0 md:hidden"
     >
       <ul className="flex w-full">
         {items.map((item) => {

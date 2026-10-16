@@ -95,15 +95,14 @@ export function AdminShell({
         <div className="sticky top-0 z-20">
           <Topbar user={user} allowedHrefs={allowedHrefs} />
           <ConnectionBanner />
+          <BottomNav
+            menuOpen={menuOpen}
+            onOpenMenu={() => setMenuOpen(true)}
+            allowedHrefs={allowedHrefs}
+          />
         </div>
-        <main className="px-4 pt-4 pb-24 md:px-6 md:pt-6 md:pb-8">{children}</main>
+        <main className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:px-6 md:pt-6 md:pb-8">{children}</main>
       </div>
-
-      <BottomNav
-        menuOpen={menuOpen}
-        onOpenMenu={() => setMenuOpen(true)}
-        allowedHrefs={allowedHrefs}
-      />
       <MenuSheet
         open={menuOpen}
         onClose={() => setMenuOpen(false)}

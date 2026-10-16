@@ -42,7 +42,7 @@ export function MenuSheet({
         role="dialog"
         aria-modal="true"
         aria-label="Semua menu"
-        className="glass glass-chrome absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-3xl border-b-0 px-4 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
+        className="glass glass-chrome absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-3xl border-b-0 px-4 pt-3 pb-[max(4.5rem,env(safe-area-inset-bottom))]"
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" />
         <div className="mb-3 flex items-center justify-between gap-3">
