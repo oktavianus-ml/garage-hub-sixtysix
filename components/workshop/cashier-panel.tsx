@@ -36,6 +36,7 @@ import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
 import {
   printReceiptSlip,
+  printsOnAndroid,
   ReceiptSlip,
   receiptDateLabel,
   receiptSlipFromSale,
@@ -139,7 +140,9 @@ export function CashierPanel({
     setHint("");
     setConfirming(false);
     if (state.receipt) {
-      queuePrint(receiptSlipFromSaved(settings, state.receipt));
+      const slip = receiptSlipFromSaved(settings, state.receipt);
+      if (printsOnAndroid()) printReceiptSlip(slip);
+      else queuePrint(slip);
     }
     router.refresh();
   }, [state, settings, router]);
@@ -148,7 +151,7 @@ export function CashierPanel({
     if (!job || printed.current === job.nonce) return;
     if (!(document.getElementById("receipt-print") instanceof HTMLElement)) return;
     printed.current = job.nonce;
-    printReceiptSlip(job.data.paper);
+    printReceiptSlip(job.data);
   }, [job]);
 
   function qtyOf(productId: string) {
@@ -192,7 +195,12 @@ export function CashierPanel({
   }
 
   function reprint(sale: WalkInSale) {
-    queuePrint(receiptSlipFromSale(settings, sale));
+    const slip = receiptSlipFromSale(settings, sale);
+    if (printsOnAndroid()) {
+      printReceiptSlip(slip);
+      return;
+    }
+    queuePrint(slip);
   }
 
   function queuePrint(data: ReceiptSlipData) {

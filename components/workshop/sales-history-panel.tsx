@@ -8,6 +8,7 @@ import type { WalkInSale } from "@/lib/data/records";
 import type { WorkshopSettings } from "@/lib/data/settings";
 import {
   printReceiptSlip,
+  printsOnAndroid,
   ReceiptSlip,
   receiptDateLabel,
   receiptSlipFromSale,
@@ -29,7 +30,7 @@ export function SalesHistoryPanel({
     if (!job || printed.current === job.nonce) return;
     if (!(document.getElementById("receipt-print") instanceof HTMLElement)) return;
     printed.current = job.nonce;
-    printReceiptSlip(job.data.paper);
+    printReceiptSlip(job.data);
   }, [job]);
 
   if (sales.length === 0) {
@@ -60,8 +61,13 @@ export function SalesHistoryPanel({
               type="button"
               className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-line px-2.5 text-xs font-semibold"
               onClick={() => {
+                const slip = receiptSlipFromSale(settings, sale);
+                if (printsOnAndroid()) {
+                  printReceiptSlip(slip);
+                  return;
+                }
                 nonce.current += 1;
-                setJob({ nonce: nonce.current, data: receiptSlipFromSale(settings, sale) });
+                setJob({ nonce: nonce.current, data: slip });
               }}
             >
               <Printer className="size-3.5" aria-hidden />

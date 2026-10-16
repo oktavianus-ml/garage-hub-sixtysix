@@ -403,14 +403,15 @@ export function SettingsPanel({
           </div>
           <button
             type="button"
-            onClick={() => printReceiptSlip(draft.paper)}
+            onClick={() => printReceiptSlip(sampleSlip(draft))}
             className={cn(buttonClass, "mt-4 inline-flex w-full items-center justify-center gap-2")}
           >
             <Printer className="size-4" aria-hidden />
             Test print
           </button>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Mencetak contoh di atas, mengikuti logo, lebar kertas, dan catatan yang sedang tampil.
+            Mencetak contoh di atas, mengikuti logo, lebar kertas, dan catatan yang sedang tampil. Di HP
+            Android, teks struk dikirim ke aplikasi RawBT.
           </p>
         </GlassCard>
       </div>

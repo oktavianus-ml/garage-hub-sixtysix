@@ -122,7 +122,104 @@ export function ReceiptSlip({ data }: { data: ReceiptSlipData }) {
   );
 }
 
-export function printReceiptSlip(paper: PaperWidth) {
+const PAPER_COLUMNS: Record<PaperWidth, number> = { "58": 32, "80": 48 };
+
+export function printsOnAndroid() {
+  return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+}
+
+function receiptColumns(paper: PaperWidth) {
+  return PAPER_COLUMNS[paper];
+}
+
+function wrapReceiptLine(text: string, width: number) {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const lines: string[] = [];
+  let rest = clean;
+  while (rest.length > width) {
+    let cut = rest.lastIndexOf(" ", width);
+    if (cut <= 0) cut = width;
+    lines.push(rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut).trimStart();
+  }
+  if (rest) lines.push(rest);
+  return lines;
+}
+
+function receiptBlock(text: string, width: number, align: "left" | "center") {
+  const rows: string[] = [];
+  for (const part of text.split(/\r?\n/)) {
+    for (const line of wrapReceiptLine(part, width)) {
+      if (align === "center" && line.length < width) {
+        rows.push(`${" ".repeat(Math.floor((width - line.length) / 2))}${line}`);
+      } else rows.push(line);
+    }
+  }
+  return rows;
+}
+
+function receiptMoney(value: number) {
+  const sign = value < 0 ? "-" : "";
+  const digits = Math.abs(Math.round(value)).toString();
+  return `${sign}${digits.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+}
+
+function receiptRow(left: string, right: string, width: number) {
+  const label = left.replaceAll("×", "x");
+  if (label.length + right.length + 1 <= width) {
+    return `${label}${" ".repeat(width - label.length - right.length)}${right}`;
+  }
+  const lines = wrapReceiptLine(label, width);
+  const last = lines.pop() ?? "";
+  if (last.length + right.length + 1 <= width) {
+    lines.push(`${last}${" ".repeat(width - last.length - right.length)}${right}`);
+  } else {
+    if (last) lines.push(last);
+    lines.push(right.length >= width ? right : right.padStart(width));
+  }
+  return lines.join("\n");
+}
+
+export function receiptPlainText(data: ReceiptSlipData) {
+  const width = receiptColumns(data.paper);
+  const rule = "-".repeat(width);
+  const title = (data.name.trim() || "Nama bengkel").toLocaleUpperCase("id-ID");
+  const details = [
+    data.showAddress ? data.address.trim() : "",
+    data.showPhone ? data.phone.trim() : "",
+  ].filter(Boolean);
+  const total = data.lines.reduce((sum, line) => sum + line.amount, 0);
+  const rows = [
+    ...receiptBlock(title, width, "center"),
+    ...details.flatMap((line) => receiptBlock(line, width, "center")),
+    rule,
+    ...receiptBlock(data.no, width, "left"),
+    ...receiptBlock(data.dateLabel, width, "left"),
+    ...data.lines.map((line) => receiptRow(line.label, receiptMoney(line.amount), width)),
+    rule,
+    receiptRow("Total", receiptMoney(total), width),
+    ...receiptBlock(data.payLabel, width, "left"),
+  ];
+  const footer = data.footer.trim();
+  if (footer) rows.push("", ...receiptBlock(footer, width, "center"));
+  return `${rows.join("\n")}\n\n\n`;
+}
+
+function openRawBt(text: string) {
+  const encoded = encodeURI(text).replaceAll("#", "%23").replaceAll("?", "%3F").replaceAll("&", "%26");
+  window.location.href = `intent:${encoded}#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;`;
+}
+
+export function printReceiptSlip(data: ReceiptSlipData) {
+  if (printsOnAndroid()) {
+    openRawBt(receiptPlainText(data));
+    return;
+  }
+  printBrowserReceipt(data.paper);
+}
+
+function printBrowserReceipt(paper: PaperWidth) {
   const source = document.getElementById("receipt-print");
   if (!(source instanceof HTMLElement)) return;
   const clone = source.cloneNode(true) as HTMLElement;
