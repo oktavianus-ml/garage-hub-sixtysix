@@ -56,7 +56,6 @@ export type ActivityDraft = {
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const QUERY_CAP = 500;
-const PAGE_CAP = 200;
 
 export function fieldChanges(before: Record<string, string>, after: Record<string, string>) {
   const fields = [...Object.keys(after), ...Object.keys(before).filter((field) => !(field in after))];
@@ -158,17 +157,44 @@ export async function listActivity(filter: {
   const action = filter.action === "buat" || filter.action === "ubah" ? filter.action : "";
   const actorId = filter.actorId ?? "";
   const query = (filter.q ?? "").trim().toLowerCase();
-  const entries = rows
-    .filter((row) => {
-      if (actorId && row.actorId !== actorId) return false;
-      if (entity && row.entity !== entity) return false;
-      if (action && row.action !== action) return false;
-      if (query && !row.label.toLowerCase().includes(query)) return false;
-      return true;
-    })
-    .slice(0, PAGE_CAP);
+  const entries = rows.filter((row) => {
+    if (actorId && row.actorId !== actorId) return false;
+    if (entity && row.entity !== entity) return false;
+    if (action && row.action !== action) return false;
+    if (query && !row.label.toLowerCase().includes(query)) return false;
+    return true;
+  });
 
-  return { ...window, entries, actors, entity, action, actorId, q: (filter.q ?? "").trim() };
+  return {
+    ...window,
+    entries,
+    actors,
+    entity,
+    action,
+    actorId,
+    q: (filter.q ?? "").trim(),
+    truncated: snap.size === QUERY_CAP,
+  };
+}
+
+export function activityQuery(filter: {
+  from: string;
+  to: string;
+  actorId?: string;
+  entity?: string;
+  action?: string;
+  q?: string;
+  page?: number;
+}) {
+  const search = new URLSearchParams();
+  search.set("dari", filter.from);
+  search.set("sampai", filter.to);
+  if (filter.actorId) search.set("pelaku", filter.actorId);
+  if (filter.entity) search.set("jenis", filter.entity);
+  if (filter.action) search.set("aksi", filter.action);
+  if (filter.q) search.set("q", filter.q);
+  if (filter.page && filter.page > 1) search.set("halaman", String(filter.page));
+  return search.toString();
 }
 
 export function formatActivityTime(iso: string) {

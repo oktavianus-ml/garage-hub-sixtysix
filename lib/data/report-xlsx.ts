@@ -232,6 +232,21 @@ ${sheets
   return zipStore(files.map((file) => ({ name: file.name, data: Buffer.from(file.data, "utf8") })));
 }
 
+export function tableWorkbook(sheetName: string, headers: string[], rows: string[][], widths: number[]) {
+  return workbookXml([
+    {
+      name: sheetName,
+      rows: [
+        headers.map((header) => text(header, true)),
+        ...rows.map((row) => row.map((value) => text(value))),
+      ],
+      widths,
+      freezeHeader: true,
+      filter: rows.length > 0,
+    },
+  ]);
+}
+
 export function salesWorkbook(
   report: SalesReport,
   brand: WorkshopBrand = { name: "GarageHub", address: "", phone: "" },
