@@ -1,54 +1,23 @@
 import type { Transaction, WriteBatch } from "firebase-admin/firestore";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { isRole, type Role } from "@/lib/auth/roles";
+import {
+  activityActionLabel,
+  activityEntityLabel,
+  ACTIVITY_ENTITIES,
+  isActivityEntity,
+  type ActivityAction,
+  type ActivityEntity,
+} from "@/lib/data/activity-kinds";
 import { jakartaDate } from "@/lib/data/format";
 
-export const ACTIVITY_ENTITIES = [
-  "pelanggan",
-  "motor",
-  "produk",
-  "distributor",
-  "pembelian",
-  "pengadaan",
-  "pegawai",
-  "spk",
-  "kasir",
-  "kas",
-  "pembayaran",
-  "bagi-hasil",
-  "audit",
-  "akun",
-  "tutup-bulan",
-  "pengaturan",
-  "akses",
-] as const;
-
-export type ActivityEntity = (typeof ACTIVITY_ENTITIES)[number];
-export type ActivityAction = "buat" | "ubah";
-
-export const activityEntityLabel: Record<ActivityEntity, string> = {
-  pelanggan: "Pelanggan",
-  motor: "Motor",
-  produk: "Produk",
-  distributor: "Distributor",
-  pembelian: "Pembelian",
-  pengadaan: "Pengadaan barang",
-  pegawai: "Pegawai",
-  spk: "Service (SPK)",
-  kasir: "Kasir",
-  kas: "Cek uang",
-  pembayaran: "Pembayaran",
-  "bagi-hasil": "Bagi hasil",
-  audit: "Audit budget",
-  akun: "Akun (COA)",
-  "tutup-bulan": "Tutup bulan",
-  pengaturan: "Pengaturan",
-  akses: "Akses menu",
-};
-
-export const activityActionLabel: Record<ActivityAction, string> = {
-  buat: "Buat",
-  ubah: "Ubah",
+export {
+  activityActionLabel,
+  activityEntityLabel,
+  ACTIVITY_ENTITIES,
+  isActivityEntity,
+  type ActivityAction,
+  type ActivityEntity,
 };
 
 export type ActivityActor = {
@@ -124,10 +93,6 @@ export function activityWindow(from?: string, to?: string) {
   return start <= end ? { from: start, to: end } : { from: end, to: start };
 }
 
-function isEntity(value: string): value is ActivityEntity {
-  return ACTIVITY_ENTITIES.includes(value as ActivityEntity);
-}
-
 function mapChange(value: unknown): ActivityChange | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Record<string, unknown>;
@@ -142,7 +107,7 @@ function mapChange(value: unknown): ActivityChange | null {
 function mapActivity(id: string, data: FirebaseFirestore.DocumentData): ActivityEntry | null {
   if (!isRole(data.actorRole)) return null;
   if (data.action !== "buat" && data.action !== "ubah") return null;
-  if (typeof data.entity !== "string" || !isEntity(data.entity)) return null;
+  if (typeof data.entity !== "string" || !isActivityEntity(data.entity)) return null;
   if (typeof data.at !== "string" || typeof data.label !== "string") return null;
   const changes = Array.isArray(data.changes) ? data.changes.flatMap((item) => {
     const change = mapChange(item);
@@ -189,7 +154,7 @@ export async function listActivity(filter: {
     .filter((actor) => actor.id)
     .sort((a, b) => a.name.localeCompare(b.name, "id"));
 
-  const entity = filter.entity && isEntity(filter.entity) ? filter.entity : "";
+  const entity = filter.entity && isActivityEntity(filter.entity) ? filter.entity : "";
   const action = filter.action === "buat" || filter.action === "ubah" ? filter.action : "";
   const actorId = filter.actorId ?? "";
   const query = (filter.q ?? "").trim().toLowerCase();

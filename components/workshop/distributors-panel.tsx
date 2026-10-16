@@ -251,21 +251,21 @@ function DistributorDirectory({
                     key={distributor.id}
                     className={cn("py-3", editingThis && "-mx-2 rounded-xl bg-teal-soft px-2")}
                   >
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                      <p className="font-medium">{distributor.name}</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{distributor.name}</p>
+                        <p className="mt-0.5 truncate text-xs text-muted">{contactLine(distributor)}</p>
+                      </div>
                       {canWrite ? (
                         <button
                           type="button"
-                          className="text-xs font-semibold text-teal"
+                          className="shrink-0 text-xs font-semibold text-teal"
                           onClick={() => onEdit(distributor)}
                         >
                           Ubah
                         </button>
                       ) : null}
                     </div>
-                    <p className="text-xs text-muted">{contactLine(distributor)}</p>
-                    {distributor.address ? <p className="mt-1 text-sm">{distributor.address}</p> : null}
-                    {distributor.note ? <p className="mt-1 text-sm text-muted">{distributor.note}</p> : null}
                   </li>
                 );
               })}

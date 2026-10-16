@@ -127,7 +127,10 @@ export function PurchasesPanel({
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<DraftLine[]>([]);
   const formRef = useRef<HTMLDivElement>(null);
-  const pickRef = useRef<HTMLSelectElement>(null);
+  const pickBoxRef = useRef<HTMLDivElement>(null);
+  const [pickQuery, setPickQuery] = useState("");
+  const [pickOpen, setPickOpen] = useState(false);
+  const [pickedId, setPickedId] = useState("");
   const snapshot = purchases
     .map((item) =>
       [
@@ -139,6 +142,20 @@ export function PurchasesPanel({
       ].join(":"),
     )
     .join("|");
+  const catalog = useMemo(
+    () => (distributorId ? products.filter((product) => product.distributorId === distributorId) : []),
+    [products, distributorId],
+  );
+  const pickMatches = useMemo(() => {
+    const needle = pickQuery.trim().toLowerCase();
+    const pool = needle
+      ? catalog.filter(
+          (product) =>
+            product.name.toLowerCase().includes(needle) || product.code.toLowerCase().includes(needle),
+        )
+      : catalog;
+    return pool.slice(0, 12);
+  }, [catalog, pickQuery]);
   const total = lines.reduce((sum, line) => sum + line.qty * line.cost, 0);
   const ready = Boolean(distributorId) && lines.length > 0 && distributors.length > 0 && products.length > 0;
 
@@ -147,6 +164,9 @@ export function PurchasesPanel({
     setDistributorId(purchase.distributorId);
     setNote(purchase.note);
     setLines(purchase.lines.map((line) => ({ productId: line.productId, qty: line.qty, cost: line.cost })));
+    setPickQuery("");
+    setPickedId("");
+    setPickOpen(false);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 
@@ -155,6 +175,9 @@ export function PurchasesPanel({
     setDistributorId("");
     setNote("");
     setLines([]);
+    setPickQuery("");
+    setPickedId("");
+    setPickOpen(false);
   }
 
   useEffect(() => {
@@ -162,7 +185,45 @@ export function PurchasesPanel({
     setDistributorId("");
     setNote("");
     setLines([]);
+    setPickQuery("");
+    setPickedId("");
+    setPickOpen(false);
   }, [snapshot]);
+
+  useEffect(() => {
+    function onPointer(event: PointerEvent) {
+      if (!pickBoxRef.current?.contains(event.target as Node)) setPickOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, []);
+
+  function chooseDistributor(next: string) {
+    setDistributorId(next);
+    setLines((current) =>
+      current.filter((line) => products.find((item) => item.id === line.productId)?.distributorId === next),
+    );
+    setPickQuery("");
+    setPickedId("");
+    setPickOpen(false);
+  }
+
+  function addPicked(productId = pickedId) {
+    const id = productId || (pickQuery.trim() ? pickMatches[0]?.id : "") || "";
+    if (!id) return;
+    const product = catalog.find((item) => item.id === id);
+    if (!product) return;
+    setLines((current) => {
+      const found = current.find((line) => line.productId === id);
+      if (found) {
+        return current.map((line) => (line.productId === id ? { ...line, qty: line.qty + 1 } : line));
+      }
+      return [...current, { productId: id, qty: 1, cost: product?.cost ?? 0 }];
+    });
+    setPickQuery("");
+    setPickedId("");
+    setPickOpen(false);
+  }
 
   return (
     <div className={cn("mt-5 grid items-start gap-4", stage === "permintaan" && canWrite && "xl:grid-cols-2")}>
@@ -205,7 +266,7 @@ export function PurchasesPanel({
                   required
                   className={inputClass}
                   value={distributorId}
-                  onChange={(event) => setDistributorId(event.target.value)}
+                  onChange={(event) => chooseDistributor(event.target.value)}
                 >
                   <option value="" disabled>
                     Pilih distributor
@@ -220,33 +281,80 @@ export function PurchasesPanel({
                   ))}
                 </select>
                 <div className="flex gap-2">
-                  <select ref={pickRef} className={inputClass} defaultValue="" aria-label="Pilih barang">
-                    <option value="">Pilih barang</option>
-                    {products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {product.code ? `${product.code} · ` : ""}
-                        {product.name} · pokok {rupiah(product.cost)} · stok {product.stock}
-                      </option>
-                    ))}
-                  </select>
+                  <div ref={pickBoxRef} className="relative min-w-0 flex-1">
+                    <label className="flex h-11 items-center gap-2 rounded-xl border border-line-strong bg-field px-3">
+                      <Search className="size-4 shrink-0 text-muted" aria-hidden />
+                      <input
+                        value={pickQuery}
+                        disabled={!distributorId}
+                        onChange={(event) => {
+                          setPickQuery(event.target.value);
+                          setPickedId("");
+                          setPickOpen(true);
+                        }}
+                        onFocus={() => {
+                          if (distributorId) setPickOpen(true);
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") {
+                            setPickOpen(false);
+                            return;
+                          }
+                          if (event.key !== "Enter") return;
+                          event.preventDefault();
+                          addPicked();
+                        }}
+                        placeholder={distributorId ? "Cari kode atau nama barang" : "Pilih distributor dulu"}
+                        className="min-w-0 flex-1 bg-transparent text-base text-ink placeholder:text-muted"
+                        style={{ outline: "none", boxShadow: "none" }}
+                        role="combobox"
+                        aria-expanded={pickOpen}
+                        aria-autocomplete="list"
+                        autoComplete="off"
+                      />
+                    </label>
+                    {pickOpen ? (
+                      <div
+                        role="listbox"
+                        className="absolute top-[calc(100%+0.35rem)] right-0 left-0 z-20 max-h-72 overflow-y-auto rounded-xl border border-line bg-white/95 p-1 shadow-[0_16px_40px_rgba(28,25,21,0.12)] dark:bg-[#16191d]/95"
+                      >
+                        {pickMatches.length === 0 ? (
+                          <p className="px-3 py-2 text-sm text-muted">
+                            {catalog.length === 0
+                              ? "Distributor ini belum punya barang."
+                              : "Tidak ketemu"}
+                          </p>
+                        ) : (
+                          pickMatches.map((product) => (
+                            <button
+                              key={product.id}
+                              type="button"
+                              role="option"
+                              aria-selected={product.id === pickedId}
+                              className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left hover-wash"
+                              onClick={() => addPicked(product.id)}
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-medium text-ink">
+                                  {product.code ? `${product.code} · ` : ""}
+                                  {product.name}
+                                </span>
+                                <span className="block text-xs text-muted">Stok {product.stock}</span>
+                              </span>
+                              <span className="shrink-0 text-sm font-semibold tabular-nums">
+                                {rupiah(product.cost)}
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
                   <button
                     type="button"
-                    className="h-11 shrink-0 rounded-xl border border-line px-3 text-sm font-semibold"
-                    onClick={() => {
-                      const productId = pickRef.current?.value ?? "";
-                      if (!productId) return;
-                      const product = products.find((item) => item.id === productId);
-                      setLines((current) => {
-                        const found = current.find((line) => line.productId === productId);
-                        if (found) {
-                          return current.map((line) =>
-                            line.productId === productId ? { ...line, qty: line.qty + 1 } : line,
-                          );
-                        }
-                        return [...current, { productId, qty: 1, cost: product?.cost ?? 0 }];
-                      });
-                      if (pickRef.current) pickRef.current.value = "";
-                    }}
+                    disabled={!distributorId}
+                    className={cn(goldGlass, "h-11 shrink-0 rounded-xl px-4 text-sm font-semibold disabled:opacity-60")}
+                    onClick={() => addPicked()}
                   >
                     Tambah
                   </button>

@@ -39,6 +39,7 @@ import {
   saveServiceOrder,
   saveVehicle,
   saveWalkInSale,
+  setProductCashierQuick,
   saveCustomerPayment,
   type SpkStatus,
 } from "@/lib/data/records";
@@ -148,9 +149,11 @@ async function saveProductRun(_prev: FormState, formData: FormData): Promise<For
   const name = String(formData.get("name") ?? "").trim();
   const cost = asInt(formData.get("cost"));
   const price = asInt(formData.get("price"));
+  const distributorId = String(formData.get("distributorId") ?? "").trim();
   if (!code || !name || cost === null || price === null) {
     return { message: "Lengkapi kode produk, nama, harga pokok, dan harga jual." };
   }
+  if (!distributorId) return { message: "Pilih distributor." };
   try {
     await saveProduct(
       {
@@ -160,6 +163,7 @@ async function saveProductRun(_prev: FormState, formData: FormData): Promise<For
         unit: String(formData.get("unit") ?? "pcs").trim() || "pcs",
         cost,
         price,
+        distributorId,
       },
       access.user,
     );
@@ -186,6 +190,23 @@ async function saveSafetyStockRun(_prev: FormState, formData: FormData): Promise
   revalidatePath("/inventori");
   revalidatePath("/");
   return { message: "Batas aman tersimpan.", ok: true };
+}
+
+async function setProductCashierQuickRun(_prev: FormState, formData: FormData): Promise<FormState> {
+  const access = await guard("/produk");
+  if (!access.canWrite) return { message: "Akun ini hanya bisa melihat." };
+  const id = String(formData.get("id") ?? "").trim();
+  const cashierQuick = formData.get("cashierQuick") === "1";
+  if (!id) return { message: "Barang tidak ditemukan." };
+  try {
+    const changed = await setProductCashierQuick(id, cashierQuick, access.user);
+    if (!changed) return { ok: true, message: cashierQuick ? "Sudah di kartu kasir." : "Sudah dilepas." };
+  } catch (error) {
+    return fail(error);
+  }
+  revalidatePath("/produk");
+  revalidatePath("/kasir");
+  return { ok: true, message: cashierQuick ? "Muncul di kartu kasir." : "Lepas dari kartu kasir." };
 }
 
 async function saveDistributorRun(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -563,11 +584,18 @@ async function saveSaleRun(_prev: FormState, formData: FormData): Promise<FormSt
     return { message: "Daftar barang tidak valid." };
   }
   try {
-    await saveWalkInSale({ lines, payMethod: parsePayMethod(formData.get("payMethod")) }, access.user);
+    const receipt = await saveWalkInSale(
+      { lines, payMethod: parsePayMethod(formData.get("payMethod")) },
+      access.user,
+    );
+    revalidatePath("/kasir");
+    revalidatePath("/");
+    revalidatePath("/inventori");
+    if (!receipt) return { ok: true, message: "Penjualan sudah tersimpan." };
+    return { ok: true, message: `${receipt.no} tersimpan.`, receipt };
   } catch (error) {
     return fail(error);
   }
-  redirect("/kasir");
 }
 
 async function saveCustomerPaymentRun(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -832,6 +860,7 @@ const runners: Record<string, (prev: FormState, formData: FormData) => Promise<F
   saveVehicle: saveVehicleRun,
   saveProduct: saveProductRun,
   saveSafetyStock: saveSafetyStockRun,
+  setProductCashierQuick: setProductCashierQuickRun,
   saveDistributor: saveDistributorRun,
   saveSupplyItem: saveSupplyItemRun,
   saveProcurement: saveProcurementRun,
@@ -860,6 +889,7 @@ export const saveCustomerAction = expose(saveCustomerRun);
 export const saveVehicleAction = expose(saveVehicleRun);
 export const saveProductAction = expose(saveProductRun);
 export const saveSafetyStockAction = expose(saveSafetyStockRun);
+export const setProductCashierQuickAction = expose(setProductCashierQuickRun);
 export const saveDistributorAction = expose(saveDistributorRun);
 export const saveSupplyItemAction = expose(saveSupplyItemRun);
 export const saveProcurementAction = expose(saveProcurementRun);

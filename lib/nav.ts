@@ -6,6 +6,7 @@ import {
   FileSpreadsheet,
   HardHat,
   History,
+  Receipt,
   Banknote,
   LayoutDashboard,
   Package,
@@ -68,6 +69,12 @@ export const navGroups: NavGroup[] = [
         href: "/kasir",
         icon: ShoppingBag,
         description: "Penjualan sparepart tanpa bongkar mesin.",
+      },
+      {
+        label: "Riwayat penjualan",
+        href: "/penjualan",
+        icon: Receipt,
+        description: "Cari penjualan kasir menurut tanggal, lalu cetak ulang struk.",
       },
       {
         label: "Pelanggan",

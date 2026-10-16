@@ -22,6 +22,7 @@ import { parsePayMethod, payMethodLabel, type PayMethod } from "@/lib/data/payme
 import { PURCHASE_STATUSES, purchaseStatusLabel, type PurchaseStatus } from "@/lib/data/purchase";
 import { isSupplyUnit } from "@/lib/data/supply";
 import { heldQty, holdDelta, type HeldPart } from "@/lib/data/stock";
+import type { SaleReceipt } from "@/lib/data/sale-receipt";
 import { alreadyApplied, commitBatch, openBatch, runMutation } from "@/lib/data/sync-receipt";
 
 export type Customer = { id: string; name: string; phone: string };
@@ -42,6 +43,8 @@ export type Product = {
   price: number;
   stock: number;
   safetyStock: number;
+  cashierQuick: boolean;
+  distributorId: string;
 };
 export type Distributor = {
   id: string;
@@ -482,6 +485,8 @@ export async function listProducts() {
       price: num(doc.data().price),
       stock: num(doc.data().stock),
       safetyStock: num(doc.data().safetyStock),
+      cashierQuick: doc.data().cashierQuick === true,
+      distributorId: text(doc.data().distributorId),
     }))
     .sort((a, b) => a.name.localeCompare(b.name, "id"));
 }
@@ -494,29 +499,44 @@ export async function saveProduct(
     unit: string;
     cost: number;
     price: number;
+    distributorId: string;
   },
   actor: ActivityActor,
 ) {
   const code = input.code.trim().toUpperCase();
   if (!code) throw new Error("Isi kode produk.");
+  if (!input.distributorId) throw new Error("Pilih distributor.");
   const ref = input.id
     ? store().collection("products").doc(input.id)
     : store().collection("products").doc();
-  const [taken, existing] = await Promise.all([
+  const [taken, existing, distributorSnap] = await Promise.all([
     store().collection("products").where("code", "==", code).limit(1).get(),
     input.id ? ref.get() : Promise.resolve(null),
+    store().collection("distributors").doc(input.distributorId).get(),
   ]);
   if (!taken.empty && taken.docs[0]?.id !== ref.id) {
     throw new Error("Kode produk sudah dipakai.");
   }
+  if (!distributorSnap.exists) throw new Error("Distributor tidak ditemukan.");
   const creating = !existing?.exists;
   const unit = input.unit || "pcs";
+  const distributorName = text(distributorSnap.data()?.name, "Distributor");
+  const previousDistributorId = text(existing?.data()?.distributorId);
+  const previousDistributorName =
+    previousDistributorId === input.distributorId
+      ? distributorName
+      : previousDistributorId
+        ? text(
+            (await store().collection("distributors").doc(previousDistributorId).get()).data()?.name,
+          )
+        : "";
   const before = priorFields(Boolean(existing?.exists), {
     Kode: text(existing?.data()?.code),
     Nama: text(existing?.data()?.name),
     Satuan: text(existing?.data()?.unit, "pcs"),
     "Harga pokok": rupiah(num(existing?.data()?.cost)),
     "Harga jual": rupiah(num(existing?.data()?.price)),
+    Distributor: previousDistributorName,
   });
   const after = {
     Kode: code,
@@ -524,6 +544,7 @@ export async function saveProduct(
     Satuan: unit,
     "Harga pokok": rupiah(input.cost),
     "Harga jual": rupiah(input.price),
+    Distributor: distributorName,
     ...(creating ? { Stok: "0" } : {}),
   };
   const batch = openBatch();
@@ -535,6 +556,7 @@ export async function saveProduct(
       unit,
       cost: input.cost,
       price: input.price,
+      distributorId: input.distributorId,
       ...(creating ? { stock: 0, safetyStock: 0 } : {}),
     },
     { merge: true },
@@ -573,6 +595,31 @@ export async function saveSafetyStock(productId: string, safetyStock: number, ac
     changes: fieldChanges(
       { "Batas aman": `${before} ${unit}` },
       { "Batas aman": `${safetyStock} ${unit}` },
+    ),
+  });
+  await commitBatch(batch);
+  return true;
+}
+
+export async function setProductCashierQuick(productId: string, cashierQuick: boolean, actor: ActivityActor) {
+  if (!productId) throw new Error("Barang tidak ditemukan.");
+  const ref = store().collection("products").doc(productId);
+  const existing = await ref.get();
+  if (!existing.exists) throw new Error("Barang tidak ditemukan.");
+  const before = existing.data()?.cashierQuick === true;
+  if (before === cashierQuick) return false;
+  const name = text(existing.data()?.name, "Produk");
+  const batch = openBatch();
+  batch.update(ref, { cashierQuick });
+  queueActivity(batch, {
+    actor,
+    action: "ubah",
+    entity: "produk",
+    entityId: ref.id,
+    label: cashierQuick ? `${name} masuk kartu kasir` : `${name} lepas dari kartu kasir`,
+    changes: fieldChanges(
+      { "Kartu kasir": before ? "Ya" : "Tidak" },
+      { "Kartu kasir": cashierQuick ? "Ya" : "Tidak" },
     ),
   });
   await commitBatch(batch);
@@ -780,10 +827,14 @@ export async function savePurchase(
     }
     const lines: PurchaseLine[] = productSnaps.map((snap) => {
       if (!snap.exists) throw new Error("Produk tidak ditemukan.");
+      const productName = text(snap.data()?.name, "Produk");
+      if (text(snap.data()?.distributorId) !== input.distributorId) {
+        throw new Error(`${productName} bukan barang distributor ini.`);
+      }
       const row = merged.get(snap.id);
       return {
         productId: snap.id,
-        name: text(snap.data()?.name, "Produk"),
+        name: productName,
         unit: text(snap.data()?.unit, "pcs"),
         qty: row?.qty ?? 0,
         cost: row?.cost ?? 0,
@@ -1656,33 +1707,46 @@ function mapPayment(id: string, data: FirebaseFirestore.DocumentData): CustomerP
   };
 }
 
+function mapSale(id: string, data: FirebaseFirestore.DocumentData): WalkInSale {
+  return {
+    id,
+    no: text(data.no),
+    cashierName: text(data.cashierName),
+    lines: mapParts(data.lines),
+    total: num(data.total),
+    costTotal: num(data.costTotal),
+    businessDate: text(data.businessDate),
+    payMethod: parsePayMethod(data.payMethod),
+    monthKey: text(data.monthKey),
+    createdAt: text(data.createdAt),
+  };
+}
+
 export async function listSales() {
   const snap = await store().collection("walkInSales").get();
   return snap.docs
-    .map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        no: text(data.no),
-        cashierName: text(data.cashierName),
-        lines: mapParts(data.lines),
-        total: num(data.total),
-        costTotal: num(data.costTotal),
-        businessDate: text(data.businessDate),
-        payMethod: parsePayMethod(data.payMethod),
-        monthKey: text(data.monthKey),
-        createdAt: text(data.createdAt),
-      } satisfies WalkInSale;
-    })
+    .map((doc) => mapSale(doc.id, doc.data()))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function listSalesBetween(from: string, to: string) {
+  const snap = await store()
+    .collection("walkInSales")
+    .where("businessDate", ">=", from)
+    .where("businessDate", "<=", to)
+    .get();
+  return snap.docs
+    .map((doc) => mapSale(doc.id, doc.data()))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function saveWalkInSale(
   input: { lines: { productId: string; qty: number }[]; payMethod: PayMethod | null },
   actor: ActivityActor,
-) {
+): Promise<SaleReceipt | null> {
   if (input.lines.length === 0) throw new Error("Pilih barang yang dijual.");
   if (!input.payMethod) throw new Error("Pilih tempat uang.");
+  if (await alreadyApplied()) return null;
   const payMethod = input.payMethod;
   const qtyByProduct = new Map<string, number>();
   for (const line of input.lines) {
@@ -1692,6 +1756,7 @@ export async function saveWalkInSale(
   const day = jakartaDate();
   const month = monthKeyOf(day);
   const database = store();
+  let receipt: SaleReceipt | null = null;
 
   await runMutation(database, async (tx) => {
     await ensureOpen(tx, month);
@@ -1737,7 +1802,15 @@ export async function saveWalkInSale(
         ...stockChanges(snaps, delta),
       ],
     });
+    receipt = {
+      no,
+      businessDate: day,
+      lines: lines.map((line) => ({ name: line.name, qty: line.qty, price: line.price })),
+      total,
+      payMethod,
+    };
   });
+  return receipt;
 }
 
 function emptyChannels(): ChannelTotals {

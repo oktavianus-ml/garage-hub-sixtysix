@@ -2,10 +2,9 @@
 
 import { useQueuedAction } from "@/components/shell/offline-status";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Moon, Receipt, Store, Sun } from "lucide-react";
+import { Moon, Printer, Receipt, Store, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 import { saveWorkshopSettingsAction } from "@/lib/data/actions";
-import { rupiah } from "@/lib/data/format";
 import {
   paperChoices,
   RECEIPT_LOGOS,
@@ -14,8 +13,9 @@ import {
   type ReceiptLogo,
 } from "@/lib/data/receipt-options";
 import type { WorkshopSettings } from "@/lib/data/settings";
+import { printReceiptSlip, ReceiptSlip, type ReceiptSlipData } from "@/components/workshop/receipt-slip";
 import { cn } from "@/lib/cn";
-import { inputClass } from "@/components/ui/controls";
+import { buttonClass, inputClass } from "@/components/ui/controls";
 import { SaveButton } from "@/components/ui/save-button";
 import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -138,70 +138,22 @@ function LogoChoice({
   );
 }
 
-function ReceiptPreview({
-  name,
-  phone,
-  address,
-  receiptFooter,
-  showPhone,
-  showAddress,
-  showLabor,
-  paper,
-  logo,
-}: WorkshopSettings) {
-  const title = name.trim() || "Nama bengkel";
-  const mark = receiptLogo(logo);
-  const items = showLabor ? [LABOR, ...PARTS] : PARTS;
-  const total = items.reduce((sum, item) => sum + item.amount, 0);
-  const lines = [
-    showAddress ? address.trim() : "",
-    showPhone ? phone.trim() : "",
-  ].filter(Boolean);
-
-  return (
-    <div
-      className="mx-auto w-full rounded-lg bg-[#fffdf8] px-4 py-5 text-[#1c1915] shadow-[0_8px_24px_rgba(28,25,21,0.12)]"
-      style={{ maxWidth: paper === "80" ? 302 : 220 }}
-    >
-      <img
-        src={mark.src}
-        alt={mark.label}
-        className="mx-auto mb-3 object-contain"
-        style={{ width: paper === "80" ? 200 : 148, height: 46 }}
-      />
-      <p className="text-center text-sm font-bold tracking-wide uppercase">{title}</p>
-      {lines.map((line, index) => (
-        <p key={`${index}-${line}`} className="mt-1 text-center text-[11px] leading-4 break-words whitespace-pre-line text-[#6b6560]">
-          {line}
-        </p>
-      ))}
-      <div className="my-3 border-t border-dashed border-[#1c1915]/25" />
-      <p className="text-[11px] font-semibold">KSR-0142</p>
-      <p className="text-[11px] text-[#6b6560]">14 Okt 2026</p>
-      <ul className="mt-3 flex flex-col gap-1">
-        {items.map((item) => (
-          <li key={item.label} className="flex justify-between gap-3 text-[11px]">
-            <span>{item.label}</span>
-            <span className="tabular-nums">{rupiah(item.amount)}</span>
-          </li>
-        ))}
-      </ul>
-      <div className="my-3 border-t border-dashed border-[#1c1915]/25" />
-      <p className="flex justify-between gap-3 text-xs font-bold">
-        <span>Total</span>
-        <span className="tabular-nums">{rupiah(total)}</span>
-      </p>
-      <p className="mt-1 text-[11px] text-[#6b6560]">Tunai</p>
-      {receiptFooter.trim() ? (
-        <>
-          <div className="my-3 border-t border-dashed border-[#1c1915]/25" />
-          <p className="text-center text-[11px] leading-4 break-words whitespace-pre-line text-[#6b6560]">
-            {receiptFooter.trim()}
-          </p>
-        </>
-      ) : null}
-    </div>
-  );
+function sampleSlip(draft: WorkshopSettings): ReceiptSlipData {
+  const items = draft.showLabor ? [LABOR, ...PARTS] : PARTS;
+  return {
+    name: draft.name,
+    phone: draft.phone,
+    address: draft.address,
+    footer: draft.receiptFooter,
+    showPhone: draft.showPhone,
+    showAddress: draft.showAddress,
+    paper: draft.paper,
+    logo: draft.logo,
+    no: "KSR-0142",
+    dateLabel: "14 Okt 2026",
+    lines: items.map((item) => ({ label: item.label, amount: item.amount })),
+    payLabel: "Tunai",
+  };
 }
 
 function DisplayModeCard() {
@@ -447,8 +399,19 @@ export function SettingsPanel({
             Angka di bawah hanya contoh, bukan transaksi sungguhan.
           </p>
           <div className="mt-4">
-            <ReceiptPreview {...draft} />
+            <ReceiptSlip data={sampleSlip(draft)} />
           </div>
+          <button
+            type="button"
+            onClick={() => printReceiptSlip(draft.paper)}
+            className={cn(buttonClass, "mt-4 inline-flex w-full items-center justify-center gap-2")}
+          >
+            <Printer className="size-4" aria-hidden />
+            Test print
+          </button>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Mencetak contoh di atas, mengikuti logo, lebar kertas, dan catatan yang sedang tampil.
+          </p>
         </GlassCard>
       </div>
     </div>
