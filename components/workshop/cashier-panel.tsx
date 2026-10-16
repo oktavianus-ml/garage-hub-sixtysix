@@ -57,6 +57,21 @@ function productIcon(name: string): LucideIcon {
   return Package;
 }
 
+const QUICK_TONES = [
+  "border-amber/25 bg-amber-soft text-amber",
+  "border-teal/25 bg-teal-soft text-teal",
+  "border-[#5b7fbe]/25 bg-[#5b7fbe]/15 text-[#4a6eab]",
+  "border-[#b06a8a]/25 bg-[#b06a8a]/15 text-[#9a5674]",
+  "border-[#6a8f55]/25 bg-[#6a8f55]/15 text-[#567844]",
+  "border-[#c47a4a]/25 bg-[#c47a4a]/15 text-[#a86438]",
+] as const;
+
+function quickTone(id: string) {
+  let hash = 0;
+  for (const char of id) hash = (hash * 33 + char.charCodeAt(0)) >>> 0;
+  return QUICK_TONES[hash % QUICK_TONES.length];
+}
+
 export function CashierPanel({
   products,
   sales,
@@ -214,9 +229,9 @@ export function CashierPanel({
             ) : (
               <div className="mt-3 flex flex-col gap-4">
                 {quickItems.length > 0 ? (
-                  <div>
+                  <div className="py-2">
                     <p className="text-xs font-semibold text-muted">Cepat</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    <div className="mt-2.5 flex flex-wrap gap-2">
                       {quickItems.map((product) => {
                         const Icon = productIcon(product.name);
                         const qty = qtyOf(product.id);
@@ -227,15 +242,15 @@ export function CashierPanel({
                             type="button"
                             disabled={out}
                             onClick={() => addProduct(product)}
-                            className="relative inline-flex max-w-32 items-center gap-1 rounded-lg border border-amber/20 bg-amber-soft px-1.5 py-1 text-left disabled:opacity-45"
+                            className={`relative inline-flex max-w-40 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-left disabled:opacity-45 ${quickTone(product.id)}`}
                           >
                             {qty > 0 ? (
-                              <span className="absolute -top-1.5 -right-1.5 grid size-4 place-items-center rounded-full bg-amber text-[9px] font-bold text-[#1c1915]">
+                              <span className="absolute -top-1.5 -right-1.5 grid size-4 place-items-center rounded-full bg-current text-[9px] font-bold text-[#1c1915]">
                                 {qty}
                               </span>
                             ) : null}
-                            <Icon className="size-3 shrink-0 text-amber" aria-hidden />
-                            <span className="line-clamp-2 text-[10px] leading-3 font-medium">{product.name}</span>
+                            <Icon className="size-3.5 shrink-0" aria-hidden />
+                            <span className="line-clamp-2 text-xs leading-4 font-medium text-ink">{product.name}</span>
                           </button>
                         );
                       })}

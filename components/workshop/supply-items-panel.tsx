@@ -10,6 +10,7 @@ import { SUPPLY_UNITS } from "@/lib/data/supply";
 import type { SupplyItem } from "@/lib/data/records";
 import { cn } from "@/lib/cn";
 import { inputClass } from "@/components/ui/controls";
+import { MoneyInput } from "@/components/ui/money-input";
 import { SaveButton } from "@/components/ui/save-button";
 import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -94,14 +95,12 @@ export function SupplyItemsPanel({ items, canWrite }: { items: SupplyItem[]; can
                   </option>
                 ))}
               </select>
-              <input
+              <MoneyInput
                 name="cost"
                 required
-                inputMode="numeric"
                 placeholder="Harga beli"
-                className={inputClass}
                 value={cost}
-                onChange={(event) => setCost(event.target.value.replace(/[^\d]/g, ""))}
+                onValueChange={setCost}
               />
             </div>
             <FormMessage state={state} />

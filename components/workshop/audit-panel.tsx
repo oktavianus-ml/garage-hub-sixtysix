@@ -8,7 +8,7 @@ import { saveBudgetAction } from "@/lib/data/actions";
 import type { BudgetAudit } from "@/lib/data/budget-types";
 import { rupiah } from "@/lib/data/format";
 import { cn } from "@/lib/cn";
-import { inputClass } from "@/components/ui/controls";
+import { MoneyInput } from "@/components/ui/money-input";
 import { SaveButton } from "@/components/ui/save-button";
 import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -144,13 +144,12 @@ export function AuditPanel({ audit, canWrite }: { audit: BudgetAudit; canWrite: 
               {audit.lines.map((line) => (
                 <label key={line.key} className="flex flex-col gap-1 text-xs font-semibold text-muted">
                   {line.label}
-                  <input
+                  <MoneyInput
+                    key={`${audit.month}:${line.key}`}
                     name={line.key}
                     required
-                    inputMode="numeric"
                     placeholder="0"
                     defaultValue={audit.saved ? line.plan : ""}
-                    className={inputClass}
                   />
                   <span className="font-normal">
                     Sudah keluar {rupiah(line.actual)}

@@ -17,15 +17,24 @@ export function MoneyInput({
   placeholder,
   required,
   defaultValue = "",
+  value: valueProp,
+  onValueChange,
+  className,
+  ariaLabel,
 }: {
-  name: string;
+  name?: string;
   placeholder?: string;
   required?: boolean;
   defaultValue?: string | number;
+  value?: string | number;
+  onValueChange?: (digits: string) => void;
+  className?: string;
+  ariaLabel?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const caretDigits = useRef<number | null>(null);
-  const [value, setValue] = useState(() => groupThousands(digitsOnly(String(defaultValue))));
+  const [uncontrolled, setUncontrolled] = useState(() => groupThousands(digitsOnly(String(defaultValue))));
+  const value = valueProp === undefined ? uncontrolled : groupThousands(digitsOnly(String(valueProp)));
 
   useLayoutEffect(() => {
     const input = inputRef.current;
@@ -52,13 +61,16 @@ export function MoneyInput({
       inputMode="numeric"
       autoComplete="off"
       placeholder={placeholder}
-      className={`${inputClass} tabular-nums`}
+      aria-label={ariaLabel}
+      className={className ? `${className} tabular-nums` : `${inputClass} tabular-nums`}
       value={value}
       onChange={(event) => {
         const raw = event.target.value;
         const selection = event.target.selectionStart ?? raw.length;
+        const digits = digitsOnly(raw);
         caretDigits.current = digitsOnly(raw.slice(0, selection)).length;
-        setValue(groupThousands(digitsOnly(raw)));
+        if (valueProp === undefined) setUncontrolled(groupThousands(digits));
+        onValueChange?.(digits);
       }}
     />
   );

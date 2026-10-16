@@ -11,6 +11,7 @@ import type { Customer, Product, ServiceOrder, SpkStatus, StaffUser, Vehicle } f
 import { composeComplaint, parseComplaint, SERVICE_JOBS } from "@/lib/data/service-jobs";
 import { cn } from "@/lib/cn";
 import { inputClass } from "@/components/ui/controls";
+import { MoneyInput } from "@/components/ui/money-input";
 import { SaveButton } from "@/components/ui/save-button";
 import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -193,13 +194,12 @@ export function ServicePanel({
                   </option>
                 ))}
               </select>
-              <input
+              <MoneyInput
+                key={editing?.id ?? "baru"}
                 name="laborCost"
                 required
-                inputMode="numeric"
                 placeholder="Ongkos jasa"
                 defaultValue={editing?.laborCost ?? 0}
-                className={inputClass}
               />
               <select name="status" className={inputClass} value={status} onChange={(event) => setStatus(event.target.value as SpkStatus)}>
                 {statuses.map((item) => (

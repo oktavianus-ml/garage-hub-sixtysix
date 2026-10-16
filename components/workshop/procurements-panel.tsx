@@ -16,6 +16,7 @@ import { purchaseStatusLabel, type PurchaseStage } from "@/lib/data/purchase";
 import type { Procurement, PurchaseStatus, SupplyItem } from "@/lib/data/records";
 import { cn } from "@/lib/cn";
 import { goldGlass, inputClass } from "@/components/ui/controls";
+import { MoneyInput } from "@/components/ui/money-input";
 import { SaveButton } from "@/components/ui/save-button";
 import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -243,13 +244,12 @@ export function ProcurementsPanel({
                               }}
                             />
                             <span className="text-xs text-muted">{item?.unit ?? saved?.unit ?? "pcs"}</span>
-                            <input
-                              inputMode="numeric"
-                              aria-label={`Harga beli ${name}`}
+                            <MoneyInput
+                              ariaLabel={`Harga beli ${name}`}
                               value={line.cost}
-                              className="h-11 w-32 rounded-xl border border-line bg-chip px-2 text-right tabular-nums"
-                              onChange={(event) => {
-                                const cost = Number(event.target.value.replace(/[^\d]/g, "") || "0");
+                              className="h-11 w-36 rounded-xl border border-line bg-chip px-2 text-right"
+                              onValueChange={(digits) => {
+                                const cost = Number(digits || "0");
                                 setLines((current) =>
                                   current.map((entry) =>
                                     entry.itemId === line.itemId ? { ...entry, cost } : entry,

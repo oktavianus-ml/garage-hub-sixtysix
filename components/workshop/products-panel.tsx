@@ -10,6 +10,7 @@ import { rupiah } from "@/lib/data/format";
 import type { Distributor, Product } from "@/lib/data/records";
 import { cn } from "@/lib/cn";
 import { inputClass } from "@/components/ui/controls";
+import { MoneyInput } from "@/components/ui/money-input";
 import { SaveButton } from "@/components/ui/save-button";
 import { SectionTitle } from "@/components/ui/section-title";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -20,22 +21,20 @@ function QuickButton({ product, canWrite }: { product: Product; canWrite: boolea
   const [state, action, pending] = useQueuedAction(setProductCashierQuickAction, "setProductCashierQuick");
   const on = product.cashierQuick;
   return (
-    <form action={action} className="shrink-0 text-right">
+    <form action={action} className="shrink-0">
       <input type="hidden" name="id" value={product.id} />
       <input type="hidden" name="cashierQuick" value={on ? "0" : "1"} />
       <button
         type="submit"
         disabled={!canWrite || pending}
         className={cn(
-          "h-8 rounded-lg border px-2.5 text-xs font-medium whitespace-nowrap disabled:opacity-60",
-          on ? "border-amber/25 bg-amber-soft text-ink" : "border-line bg-chip text-muted",
+          "inline-flex h-9 items-center justify-center rounded-xl border px-3 text-xs font-semibold whitespace-nowrap disabled:opacity-60",
+          on ? "border-teal/25 bg-teal-soft text-teal" : "border-line bg-chip text-muted",
         )}
       >
         {pending ? "Menyimpan" : on ? "Di kasir" : "Tampil cepat"}
       </button>
-      {state?.message ? (
-        <p className={cn("mt-1 text-[11px]", state.ok ? "text-teal" : "text-danger")}>{state.message}</p>
-      ) : null}
+      {state?.message && !state.ok ? <p className="mt-1 text-right text-[11px] text-danger">{state.message}</p> : null}
     </form>
   );
 }
@@ -167,23 +166,19 @@ export function ProductsPanel({
                     </option>
                   ))}
                 </select>
-                <input
+                <MoneyInput
                   name="cost"
                   required
-                  inputMode="numeric"
                   placeholder="Harga pokok"
-                  className={inputClass}
                   value={cost}
-                  onChange={(event) => setCost(event.target.value)}
+                  onValueChange={setCost}
                 />
-                <input
+                <MoneyInput
                   name="price"
                   required
-                  inputMode="numeric"
                   placeholder="Harga jual"
-                  className={inputClass}
                   value={price}
-                  onChange={(event) => setPrice(event.target.value)}
+                  onValueChange={setPrice}
                 />
                 <p className="text-sm leading-6 text-muted sm:col-span-2">
                   Barang ini hanya muncul saat minta barang ke distributor yang dipilih.
@@ -237,17 +232,23 @@ export function ProductsPanel({
                         <span className="text-xs font-semibold tracking-wide text-muted">{product.code}</span>
                       ) : null}
                     </p>
-                    <p className="text-xs text-muted">
-                      Pokok {rupiah(product.cost)} · jual {rupiah(product.price)} · {product.unit}
-                      {" · "}
-                      {distributor?.name ?? "Belum ada distributor"}
+                    <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted">
+                      <span className="rounded-md bg-amber-soft px-1.5 py-0.5 font-semibold text-amber">
+                        Pokok {rupiah(product.cost)}
+                      </span>
+                      <span className="rounded-md bg-teal-soft px-1.5 py-0.5 font-semibold text-teal">
+                        Jual {rupiah(product.price)}
+                      </span>
+                      <span>
+                        {product.unit} · {distributor?.name ?? "Belum ada distributor"}
+                      </span>
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     {canWrite ? (
                       <button
                         type="button"
-                        className="inline-flex h-10 items-center justify-center rounded-xl border border-amber/25 bg-amber-soft px-4 text-sm font-semibold text-ink"
+                        className="inline-flex h-9 items-center justify-center rounded-xl border border-amber/25 bg-amber-soft px-3 text-xs font-semibold whitespace-nowrap text-ink"
                         onClick={() => beginEdit(product)}
                       >
                         Ubah
