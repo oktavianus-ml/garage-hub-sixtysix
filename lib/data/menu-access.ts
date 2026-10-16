@@ -59,7 +59,6 @@ export async function menuAccessTarget(userId: string) {
 }
 
 export function effectiveOpen(role: Role, userId: string, store: MenuAccessStore) {
-  if (role === "pemilik") return configurableHrefs();
   if (userId && Object.hasOwn(store.users, userId)) return store.users[userId];
   if (isConfigurableRole(role) && Object.hasOwn(store.roles, role)) return store.roles[role] ?? [];
   return defaultOpenHrefs(role);

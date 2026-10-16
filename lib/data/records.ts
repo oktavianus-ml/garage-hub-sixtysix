@@ -876,7 +876,7 @@ export async function savePurchase(
 
 export async function placePurchase(id: string, actor: ActivityActor) {
   if (!canPlacePurchase(actor.role)) {
-    throw new Error("Hanya pemilik yang menyetujui permintaan.");
+    throw new Error("Hanya pemilik dan investor yang menyetujui permintaan.");
   }
   const database = store();
   await runMutation(database, async (tx) => {
@@ -915,7 +915,7 @@ export async function cancelPurchase(id: string, actor: ActivityActor) {
       throw new Error("Barang yang sudah diterima tidak bisa dibatalkan.");
     }
     if (purchase.status === "dipesan" && !canPlacePurchase(actor.role)) {
-      throw new Error("Hanya pemilik yang membatalkan pesanan.");
+      throw new Error("Hanya pemilik dan investor yang membatalkan pesanan.");
     }
     tx.update(ref, { status: "batal" });
     queueActivity(tx, {
@@ -1254,7 +1254,7 @@ export async function saveProcurement(
 
 export async function placeProcurement(id: string, actor: ActivityActor) {
   if (!canPlacePurchase(actor.role)) {
-    throw new Error("Hanya pemilik yang menyetujui permintaan.");
+    throw new Error("Hanya pemilik dan investor yang menyetujui permintaan.");
   }
   const database = store();
   await runMutation(database, async (tx) => {
@@ -1292,7 +1292,7 @@ export async function cancelProcurement(id: string, actor: ActivityActor) {
       throw new Error("Barang yang sudah diterima tidak bisa dibatalkan.");
     }
     if (record.status === "dipesan" && !canPlacePurchase(actor.role)) {
-      throw new Error("Hanya pemilik yang membatalkan pesanan.");
+      throw new Error("Hanya pemilik dan investor yang membatalkan pesanan.");
     }
     tx.update(ref, { status: "batal" });
     queueActivity(tx, {
@@ -1520,7 +1520,7 @@ export async function saveServiceOrder(
   const role = actor.role;
   if (!SPK_STATUSES.includes(input.status)) throw new Error("Status tidak dikenal.");
   if ((input.status === "lunas" || input.status === "batal") && !canMarkPaid(role)) {
-    throw new Error("Hanya kasir atau pemilik yang menandai lunas dan batal.");
+    throw new Error("Hanya kasir, pemilik, atau investor yang menandai lunas dan batal.");
   }
   if (role === "mekanik" && !["antri", "dikerjakan", "selesai"].includes(input.status)) {
     throw new Error("Mekanik mengubah status sampai selesai.");

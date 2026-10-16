@@ -8,6 +8,7 @@ import {
   builtinAccess,
   CONFIGURABLE_ROLES,
   configurableHrefs,
+  hasFullMenuAccess,
   isConfigurableRole,
   menuGroups,
   type ConfigurableRole,
@@ -82,20 +83,18 @@ export function MenuAccessPanel({
 }) {
   const [state, action, pending] = useQueuedAction(saveMenuAccessAction, "saveMenuAccess");
   const [mode, setMode] = useState<"peran" | "orang">("peran");
-  const [role, setRole] = useState<ConfigurableRole>("kasir");
+  const [role, setRole] = useState<ConfigurableRole>("pemilik");
   const people = [...staff].sort((left, right) => {
     if (left.role === "pemilik" && right.role !== "pemilik") return -1;
     if (right.role === "pemilik" && left.role !== "pemilik") return 1;
     return left.name.localeCompare(right.name, "id");
   });
-  const [personId, setPersonId] = useState(people.find((person) => person.role !== "pemilik")?.id ?? people[0]?.id ?? "");
+  const [personId, setPersonId] = useState(people[0]?.id ?? "");
   const person = people.find((item) => item.id === personId) ?? null;
-  const locked = mode === "orang" && person?.role === "pemilik";
   const savedCustom = Boolean(person && Object.hasOwn(users, person.id));
   const roleMenus = (subject: Role) => (isConfigurableRole(subject) ? roles[subject] : configurableHrefs());
-  const baseline = locked
-    ? configurableHrefs()
-    : mode === "peran"
+  const baseline =
+    mode === "peran"
       ? roles[role]
       : person
         ? savedCustom
@@ -112,14 +111,13 @@ export function MenuAccessPanel({
     setCustomizing(false);
   }
 
-  const editable = !locked && (mode === "peran" || savedCustom || customizing);
+  const editable = mode === "peran" || savedCustom || customizing;
   const selected = new Set(draft);
   const dirty = !sameMenus(draft, baseline) || (mode === "orang" && customizing && !savedCustom);
   const subjectRole: Role = mode === "peran" ? role : (person?.role ?? "kasir");
   const groups = menuGroups();
 
   function hint(href: string) {
-    if (subjectRole === "pemilik") return "Bisa ubah";
     return builtinAccess(subjectRole, href) === "write" ? "Bisa ubah" : "Bisa lihat";
   }
 
@@ -215,16 +213,18 @@ export function MenuAccessPanel({
             })}
           </ul>
         )}
-        <p className="mt-3 text-xs leading-5 text-muted">Pemilik selalu membuka semua menu, termasuk halaman ini.</p>
+        <p className="mt-3 text-xs leading-5 text-muted">
+          Halaman ini tetap terbuka untuk pemilik dan investor.
+        </p>
       </GlassCard>
 
       <GlassCard className="p-4">
         <SectionTitle icon={ShieldCheck}>{title}</SectionTitle>
         <p className="mt-2 text-sm leading-6 text-muted">
-          {locked
-            ? "Akun pemilik tidak bisa dibatasi."
-            : mode === "orang" && !savedCustom && !customizing
-              ? "Centang ini mengikuti peran. Atur khusus bila menu orang ini harus berbeda."
+          {mode === "orang" && !savedCustom && !customizing
+            ? "Centang ini mengikuti peran. Atur khusus bila menu orang ini harus berbeda."
+            : hasFullMenuAccess(subjectRole)
+              ? "Menu yang ditutup tidak muncul, dan halamannya tidak bisa dibuka."
               : "Menu yang ditutup tidak muncul, dan halamannya tidak bisa dibuka. Menu di luar bawaan peran hanya bisa dilihat."}
         </p>
         {!person && mode === "orang" ? null : (
@@ -279,7 +279,7 @@ export function MenuAccessPanel({
         {state?.message ? (
           <p className={cn("mt-3 text-sm", state.ok ? "text-teal" : "text-danger")}>{state.message}</p>
         ) : null}
-        {locked || (mode === "orang" && !person) ? null : (
+        {mode === "orang" && !person ? null : (
           <div className="mt-4 flex flex-wrap gap-2">
             {mode === "orang" && savedCustom ? (
               <form action={action}>

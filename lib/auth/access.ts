@@ -3,6 +3,7 @@ import {
   branchChildren,
   builtinAccess,
   configurableHrefs,
+  hasFullMenuAccess,
   MENU_ACCESS_HREF,
   menuKey,
   type Access,
@@ -12,9 +13,9 @@ import { effectiveOpen, loadMenuAccess } from "@/lib/data/menu-access";
 export type { Access };
 
 export async function accessFor(role: Role, href: string, userId = ""): Promise<Access> {
-  if (role === "pemilik") return builtinAccess(role, href);
   const key = menuKey(href);
-  if (!key || key === MENU_ACCESS_HREF) return "none";
+  if (key === MENU_ACCESS_HREF) return hasFullMenuAccess(role) ? "write" : "none";
+  if (!key) return "none";
   const open = new Set(effectiveOpen(role, userId, await loadMenuAccess()));
   if (key === "/pembelian" || key === "/pengadaan") {
     const children = branchChildren(key).filter((child) => open.has(child));
@@ -26,9 +27,10 @@ export async function accessFor(role: Role, href: string, userId = ""): Promise<
 }
 
 export async function allowedHrefs(role: Role, userId = "") {
-  if (role === "pemilik") return [...configurableHrefs(), MENU_ACCESS_HREF];
   const open = new Set(effectiveOpen(role, userId, await loadMenuAccess()));
-  return configurableHrefs().filter((href) => open.has(href));
+  const hrefs = configurableHrefs().filter((href) => open.has(href));
+  if (hasFullMenuAccess(role)) hrefs.push(MENU_ACCESS_HREF);
+  return hrefs;
 }
 
 export async function firstOpenHref(role: Role, userId: string, prefix: "/pembelian" | "/pengadaan") {
@@ -37,9 +39,9 @@ export async function firstOpenHref(role: Role, userId: string, prefix: "/pembel
 }
 
 export function canMarkPaid(role: Role) {
-  return role === "pemilik" || role === "kasir";
+  return role === "pemilik" || role === "investor" || role === "kasir";
 }
 
 export function canPlacePurchase(role: Role) {
-  return role === "pemilik";
+  return role === "pemilik" || role === "investor";
 }

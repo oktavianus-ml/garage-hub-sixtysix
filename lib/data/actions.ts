@@ -822,7 +822,6 @@ async function saveMenuAccessRun(_prev: FormState, formData: FormData): Promise<
       const userId = String(formData.get("userId") ?? "").trim();
       const person = await menuAccessTarget(userId);
       if (!person) return { message: "Pegawai tidak ditemukan." };
-      if (person.role === "pemilik") return { message: "Pemilik selalu membuka semua menu." };
       if (!isConfigurableRole(person.role)) return { message: "Peran pegawai tidak dikenal." };
       if (intent === "reset") {
         const changed = await clearUserMenus(userId, person.name, person.role, access.user);

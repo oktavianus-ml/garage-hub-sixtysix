@@ -5,7 +5,7 @@ export type Access = "none" | "read" | "write";
 
 export const MENU_ACCESS_HREF = "/akses-menu";
 
-export const CONFIGURABLE_ROLES = ["investor", "kasir", "gudang", "mekanik"] as const;
+export const CONFIGURABLE_ROLES = ["pemilik", "investor", "kasir", "gudang", "mekanik"] as const;
 
 export type ConfigurableRole = (typeof CONFIGURABLE_ROLES)[number];
 
@@ -25,24 +25,13 @@ const shared: Record<string, Access> = {
   "/bagi-hasil": "none",
 };
 
+export function hasFullMenuAccess(role: Role) {
+  return role === "pemilik" || role === "investor";
+}
+
 const byRole: Record<Role, Record<string, Access>> = {
   pemilik: {},
-  investor: {
-    "/": "read",
-    "/service": "read",
-    "/kasir": "read",
-    "/penjualan": "read",
-    "/pelanggan": "read",
-    "/produk": "read",
-    "/inventori": "read",
-    "/distributor": "read",
-    "/pembelian": "read",
-    "/pengadaan": "read",
-    "/kas": "read",
-    "/pembayaran": "read",
-    "/bagi-hasil": "read",
-    "/audit": "read",
-  },
+  investor: {},
   kasir: {
     "/": "read",
     "/service": "write",
@@ -137,13 +126,13 @@ function legacyKey(href: string) {
 }
 
 export function builtinAccess(role: Role, href: string): Access {
-  if (role === "pemilik") return isNavHidden(href) ? "none" : "write";
+  if (hasFullMenuAccess(role)) return isNavHidden(href) ? "none" : "write";
   const key = legacyKey(href);
   return byRole[role][key] ?? shared[key] ?? "none";
 }
 
 export function defaultOpenHrefs(role: Role) {
-  if (role === "pemilik") return configurableHrefs();
+  if (hasFullMenuAccess(role)) return configurableHrefs();
   return configurableHrefs().filter((href) => builtinAccess(role, href) !== "none");
 }
 
